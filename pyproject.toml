@@ -24,7 +24,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-extend-exclude = [".worktrees"]
+extend-exclude = [".worktrees", "docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
