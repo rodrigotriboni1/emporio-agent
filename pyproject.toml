@@ -1,0 +1,30 @@
+[project]
+name = "emporio-agent"
+version = "0.1.0"
+description = "Customer-service agent prototype for Empório da Música"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/emporio"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = [".worktrees"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
