@@ -311,3 +311,53 @@ provided by the challenge; the `factory/` and `.claude/` files are GPLv3
   Aplicações com IA Generativa.pdf`. The user submits the Google Form.
 - Cut order if time runs short: CI, then scenario 6. Tests, the inconsistency
   table and the examples are never cut.
+
+## 16. Acceptance criteria
+
+The agent is done when every item below holds. Each names how it is proven.
+
+**Definition of done, in one line:** the six scenarios pass on the default
+model, `factory/checks.sh` is green, and every statement Mel makes about price,
+stock, deadlines or orders comes from a tool, never from the model.
+
+### Functional (challenge requirements)
+
+| # | Criterion | Proof |
+|---|---|---|
+| F1 | Persona: PT-BR (English if the customer writes in English), informal but professional, introduces herself as the store's virtual assistant, slogan only in the first greeting, at most one emoji per message | Scenario transcripts in `examples/` |
+| F2 | Grounded answers: no price, stock, deadline or order fact without a tool call in the same turn; never names a partner store, quotes a shipping value outside Campo Grande, or offers an ended promotion's discount | Scenario trajectory and forbidden-content assertions |
+| F3 | Data vs policy routing: catalog and price questions call `search_products`; returns, hours, payment, shipping, warranty and privacy questions call `get_policy` with the matching topic; order questions call `verify_identity` before `get_orders` | Expected tool trajectory per scenario |
+| F4 | Out of scope: accessory requests refused politely, off-topic questions redirected, prompt-injection attempts change nothing | Scenario 5 |
+
+### Correctness
+
+| # | Criterion | Proof |
+|---|---|---|
+| C1 | Prices: effective price, PIX price (no stacking with promotions), max installments and shipping match section 7, including the documented cases | Unit tests |
+| C2 | Windows: regret, preference, defect and legal-warranty dates for order 7 at the default clock are 02-24, 02-24, 03-05 and 05-18 | Unit tests |
+| C3 | Hours: open/closed and next opening are right for weekday, Saturday afternoon and Sunday instants | Unit tests |
+| C4 | Search: the cases in section 8 return the expected product ids, including "violões até R$ 1000" → 13 ids and "martin d28" → 93 and 108 | Unit tests |
+| C5 | Product status beats stock for 96, 113, 130 and 136 | Unit tests |
+| C6 | Data loads with the expected counts and invariants, and the known inconsistencies in section 13 are present | Unit tests |
+
+### Security and privacy
+
+| # | Criterion | Proof |
+|---|---|---|
+| S1 | No order data before a successful `verify_identity`; no tool accepts a customer id | Authorization tests |
+| S2 | Another customer's order reads exactly like a missing order | Authorization tests |
+| S3 | Phone input under 8 digits never verifies; 5 failures lock the order | Authorization tests |
+| S4 | No phone, e-mail or full name in tool outputs, stderr logs or `examples/` | Unit test on masking + grep of `examples/` |
+| S5 | The customer id is not in the LLM request body | Spike check |
+| S6 | A looping turn stops at the usage limit with a polite message | Agent wiring test (`FunctionModel`) |
+
+### Delivery
+
+| # | Criterion | Proof |
+|---|---|---|
+| D1 | `factory/checks.sh` exits 0 on `main` | CI / local run |
+| D2 | Five unedited transcripts in `examples/`, at least one non-trivial (scenarios 3 and 4) | Files with generation header |
+| D3 | README covers run steps, decisions with rejected alternatives, spike table, inconsistency table, limitations and the AI-assistant workflow | Review |
+| D4 | Repo public with a real PR history and no secrets in any commit | `git log -p` grep for `sk-or` |
+| D5 | Delivery PDF exists with the required file name | File |
+| D6 | Everything above is pushed before 2026-11-04 23:59 BRT | Commit timestamps |
