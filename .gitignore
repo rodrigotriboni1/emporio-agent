@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets and local state
+.env
+*.db
+handoffs.jsonl
+
+# Software factory
+/factory/jobs/
+/.worktrees/
+
+# OS
+.DS_Store
