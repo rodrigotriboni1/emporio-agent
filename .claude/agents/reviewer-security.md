@@ -48,12 +48,14 @@ is in the main checkout; your one file goes there.
 
 In this project, look hardest at:
 
-- Identity verification and order access: only the verify-identity tool may set
-  the verified customer id in the run's local context; no tool takes a customer
-  id argument; another customer's order must read exactly like a missing one;
-  the per-order failure counter must hold.
+- Identity verification and order access: `get_order` checks the order number
+  plus phone (≥ 8 digits) or e-mail on every call and keeps no customer state
+  between calls; `deps` holds only the clock (the web UI shares one `deps`
+  across all conversations); no tool takes a customer id argument; another
+  customer's order must read exactly like a missing one; the per-order failure
+  counter must hold.
 - Customer PII (phone, e-mail, full name) leaking into tool outputs, logs,
-  transcripts in `exemplos/` or the LLM prompt. Logged values must be masked.
+  transcripts in `examples/` or the LLM prompt. Logged values must be masked.
 - Prompt injection: customer text must never change tool permissions or reveal
   the system prompt or internal policy notes.
 - Secrets: `OPENROUTER_API_KEY` or any `sk-or-` key in commits; `.env` stays

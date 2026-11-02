@@ -25,7 +25,7 @@ below favours the smallest thing that is correct and explainable.
 ## 2. Non-goals
 
 Router or multi-agent setups, RAG or embeddings, text-to-SQL, persistent
-sessions, web API, Docker, custom UI, write operations (cart, order changes,
+sessions, custom web API, Docker, custom UI, write operations (cart, order changes,
 returns), a purchase simulator, a guardrail classifier model, holiday calendar,
 local models. Each is named in the README as considered and why it was cut.
 
@@ -34,19 +34,24 @@ local models. Each is named in the README as considered and why it was cut.
 | Concern | Choice |
 |---|---|
 | Language / tooling | Python 3.12, `uv`, `pytest`, `ruff`, `pyproject.toml`, `uv.lock` |
-| Agent framework | PydanticAI, `pydantic-ai-slim[openrouter]` pinned to an exact version |
+| Agent framework | PydanticAI, `pydantic-ai-slim[openrouter,web]` pinned to an exact version |
 | LLM provider | OpenRouter only; model from env `MODEL` (e.g. `openrouter:google/gemini-3.8-flash`) |
 | Fallback framework | plain `openai` SDK with a hand-written loop, only if the spike fails |
-| Interface | CLI (`python -m emporio.cli`) |
+| Interface | PydanticAI's built-in web chat UI (`agent.to_web()`, run with `uv run uvicorn emporio.web:app`) and a CLI (`python -m emporio.cli`) |
 | CI | GitHub Actions: `uv sync --frozen`, `ruff check`, `ruff format --check`, `pytest` (no secrets) |
 
 Why PydanticAI (details and sources in the research note): native OpenRouter
-provider with no base-URL or API-mode workarounds; `deps` / `RunContext.deps`
-keeps the verified customer id outside the tool schema, so the model cannot
-supply it; `UsageLimits` caps LLM calls per turn; typed `ToolCallPart`s make
+provider with no base-URL or API-mode workarounds; a built-in web chat UI for
+local use; `UsageLimits` caps LLM calls per turn; typed `ToolCallPart`s make
 trajectory assertions short; `TestModel` / `FunctionModel` allow agent tests
-without credits; v2 is stable; the slim install resolves to 20 packages and
-pulls no LiteLLM. Rejected: Google ADK (needs LiteLLM for OpenRouter, 81
+without credits; v2 is stable; the slim install pulls no LiteLLM.
+
+Web UI caveat (checked in `pydantic_ai/ui/_web/app.py`, v2.64.0): `to_web()`
+takes one `deps` object "for all requests", and the browser sends the message
+history with each request. Any per-customer state kept in `deps` would leak
+across conversations, so the design keeps no customer state at all (section 9).
+The UI front end loads from a CDN by default and is meant for local
+development, which matches a prototype. Rejected: Google ADK (needs LiteLLM for OpenRouter, 81
 packages), OpenAI Agents SDK (Responses API default, tracing to OpenAI,
 pre-1.0), Vercel `ai` for Python (beta, no OpenRouter path, no local context),
 LangChain/LangGraph (more concepts, OpenRouter package in beta).
@@ -58,8 +63,9 @@ catalog with ceiling, hours, return, accessory, off-topic, injection, order
 without verification) against Gemini Flash, Claude Sonnet and DeepSeek on
 OpenRouter. Record per model: right tool called, valid args, LLM calls per
 turn, latency, cost. The winner is the default in `.env.example`; the table
-goes in the README. The spike also confirms that the customer id never appears
-in the request body and that multi-turn history stays valid for all three.
+goes in the README. The spike also confirms that multi-turn history stays
+valid for all three, that the model re-sends the customer's credentials on a
+follow-up order question, and that the web UI opens and chats via OpenRouter.
 
 ## 4. Architecture
 
@@ -71,10 +77,11 @@ src/emporio/
 ├── domain.py    # frozen dataclasses, enums, value objects, pure rules. No I/O.
 ├── store.py     # loads data/*.csv and data/politicas.md into domain objects;
 │                #   queries; load-time invariants
-├── services.py  # use cases: search, policy, verify identity, orders, handoff.
+├── services.py  # use cases: search, policy, order lookup, handoff.
 │                #   Authorization is enforced here.
-├── agent.py     # PydanticAI Agent, tool wrappers, Deps
+├── agent.py     # PydanticAI Agent, tool wrappers, Deps (clock only)
 ├── prompt.py    # Mel's instructions
+├── web.py       # app = agent.to_web(...)
 └── cli.py       # REPL over agent.run_sync with message_history
 data/            # products.csv, categories.csv, customers.csv, orders.csv,
                  #   order_items.csv, promotions.csv, politicas_da_loja.pdf, politicas.md
@@ -161,15 +168,14 @@ OrderItem N–1 Product`.
 
 ## 8. Tools
 
-Five tools with English names and docstrings, scalar parameters, and outputs
+Four tools with English names and docstrings, scalar parameters, and outputs
 that are already computed and formatted. The LLM never does arithmetic.
 
 | Tool | Parameters | Returns |
 |---|---|---|
 | `search_products` | `query=""`, `category=""`, `max_price=""` | up to 8 items, available first, plus "showing 8 of 13"; a single match returns full detail (specs, promotion or ended promotions, PIX price, max installments, availability label) |
 | `get_policy` | `topic`: `contact`, `hours`, `payment`, `returns`, `warranty`, `shipping`, `promotions`, `privacy`, `scope` | that section of `data/politicas.md`; `hours` also says whether the store is open now and when it next opens |
-| `verify_identity` | `order_id`, `phone_or_email` | success with the customer's first name, or a generic failure |
-| `get_orders` | `order_id=0` (0 = all of the verified customer's orders) | status explained, tracking code, delay, return and warranty windows |
+| `get_order` | `order_id`, `phone_or_email` | credentials checked on every call; on success: the customer's first name, the order's status explained, tracking code, delay, return and warranty windows, plus the ids of the customer's other orders; on failure: a generic "couldn't find an order with these details" |
 | `handoff_to_human` | `reason`, `summary` | protocol number; appends to `handoffs.jsonl` (gitignored); outside hours, says when the team is back |
 
 Search rules (deterministic):
@@ -198,17 +204,22 @@ Search rules (deterministic):
   customers). E-mail compared trimmed and case-insensitive. Anchoring on the
   order solves the duplicated e-mail (`bruno.martins@jmail.com`, customers 11
   and 43).
-- Only `verify_identity` writes `deps.verified_customer_id`. No tool accepts a
-  customer id. Deps are never templated into instructions.
-- Another customer's order returns the same "not found" as a missing one.
+- Stateless: `get_order` checks the credentials on every call and nothing about
+  the customer is stored between calls. `deps` holds only the clock, so the web
+  UI's shared `deps` cannot leak a verification between conversations. No tool
+  accepts a customer id. The customer's own credentials stay in their
+  conversation history so the model can re-send them on follow-up questions.
+- Wrong credentials and another customer's order return the same generic
+  failure as a missing order.
 - Failures are counted per order id in the process; 5 failures lock that order
   until restart and Mel offers a human.
 - Tools never return phone, e-mail or full name; Mel uses the first name only
-  after verification.
+  after a successful `get_order`.
 - The tool-call log (stderr) and transcripts mask PII (`***3456`,
   `l***@jmail.com`).
-- History lives in memory only. Persisting it would store customer PII on disk
-  (LGPD, manual 9) and let a verification outlive the conversation.
+- History lives in memory only (CLI process, or the browser tab in the web
+  UI). Persisting it server-side would store customer PII on disk (LGPD,
+  manual 9).
 
 ## 10. Mel (prompt)
 
@@ -228,12 +239,14 @@ Search rules (deterministic):
 - Conflicting data: offer to confirm with the team.
 - Categories with no products (wind, orchestral strings): "nothing available in
   the system right now", not "we don't sell it".
-- One verification call per piece of data the customer gives.
+- Asks for the order number and the phone or e-mail before any order question;
+  one `get_order` call per set of details the customer gives; never guesses
+  or varies them.
 
 ## 11. Loop guard and logging
 
 Each turn runs with `UsageLimits(request_limit=10)` (exact value set by the
-spike); `UsageLimitExceeded` becomes a polite CLI message plus handoff offer.
+spike); `UsageLimitExceeded` becomes a polite message plus handoff offer.
 Each tool call is logged to stderr with masked arguments.
 
 ## 12. Testing
@@ -244,14 +257,15 @@ Each tool call is logged to stderr with masked arguments.
   03-05, legal warranty until 05-18); next opening; search cases from section
   8; `max_price` parsing; status handling for 96, 113, 130, 136; load counts
   and invariants; known inconsistencies.
-- **Authorization (no LLM, CI):** unverified → denied; verified as customer 3
-  asking for order 10 → "not found"; short phone input rejected; 5 failures
-  lock the order; "I'm an admin" text changes nothing.
+- **Authorization (no LLM, CI):** wrong credentials → generic failure;
+  customer 3's phone with order 10 → same generic failure; short phone input
+  rejected; 5 failures lock the order; "I'm an admin" text changes nothing;
+  two calls in a row share no customer state.
 - **Agent wiring (no LLM, CI):** `TestModel` / `FunctionModel` drive the agent
-  to check tool registration, deps flow and the usage limit.
+  to check tool registration and the usage limit; the web app object builds.
 - **Scenarios (live LLM, `scripts/scenarios.py`):** six scripted conversations
   run against OpenRouter at temperature 0. Each asserts the tool trajectory
-  (expected tools called; no order data before verification) and forbidden
+  (expected tools called; no order data without a successful `get_order`) and forbidden
   content (partner store names, ended discounts, customer e-mail) and writes
   `examples/NN-name.md` with model, `EMPORIO_NOW`, run date and masked tool
   calls inline. Transcripts are never hand-edited; a bad run is regenerated.
@@ -263,7 +277,7 @@ Scenarios (five delivered, the sixth is a test only):
    its PIX price).
 2. Price and installments of the Takamine GD20 (R$ 2.199,00; PIX
    R$ 2.089,05; up to 12x of R$ 183,25; its 12% promotion has ended).
-3. "Me arrependi, posso devolver?" → verification → order 7 → regret window
+3. "Me arrependi, posso devolver?" → Mel asks for order and phone → `get_order` for order 7 → regret window
    closed → legal warranty path → handoff.
 4. Order 8 shipped and late → tracking code, apology, handoff offer.
 5. Accessories, off-topic and injection in one conversation.
@@ -305,7 +319,7 @@ provided by the challenge; the `factory/` and `.claude/` files are GPLv3
 - One PR per stage, merge commits only (no squash), Conventional Commits in
   English. Never push to `main` directly.
 - Implementation slices run as `factory` issues where useful: domain + tests,
-  store + data loading, agent + CLI, scenarios + README.
+  store + data loading, agent + web UI + CLI, scenarios + README.
 - A 1–2 page English PDF with the repo link, solution summary, key decisions
   and run steps, named `Rodrigo Triboni - AI Engineer – Full-Stack para
   Aplicações com IA Generativa.pdf`. The user submits the Google Form.
@@ -326,7 +340,7 @@ stock, deadlines or orders comes from a tool, never from the model.
 |---|---|---|
 | F1 | Persona: PT-BR (English if the customer writes in English), informal but professional, introduces herself as the store's virtual assistant, slogan only in the first greeting, at most one emoji per message | Scenario transcripts in `examples/` |
 | F2 | Grounded answers: no price, stock, deadline or order fact without a tool call in the same turn; never names a partner store, quotes a shipping value outside Campo Grande, or offers an ended promotion's discount | Scenario trajectory and forbidden-content assertions |
-| F3 | Data vs policy routing: catalog and price questions call `search_products`; returns, hours, payment, shipping, warranty and privacy questions call `get_policy` with the matching topic; order questions call `verify_identity` before `get_orders` | Expected tool trajectory per scenario |
+| F3 | Data vs policy routing: catalog and price questions call `search_products`; returns, hours, payment, shipping, warranty and privacy questions call `get_policy` with the matching topic; order questions make Mel ask for the order number and phone or e-mail, then call `get_order` | Expected tool trajectory per scenario |
 | F4 | Out of scope: accessory requests refused politely, off-topic questions redirected, prompt-injection attempts change nothing | Scenario 5 |
 
 ### Correctness
@@ -344,11 +358,11 @@ stock, deadlines or orders comes from a tool, never from the model.
 
 | # | Criterion | Proof |
 |---|---|---|
-| S1 | No order data before a successful `verify_identity`; no tool accepts a customer id | Authorization tests |
+| S1 | No order data without valid credentials in the same `get_order` call; no customer state kept between calls; no tool accepts a customer id | Authorization tests |
 | S2 | Another customer's order reads exactly like a missing order | Authorization tests |
 | S3 | Phone input under 8 digits never verifies; 5 failures lock the order | Authorization tests |
 | S4 | No phone, e-mail or full name in tool outputs, stderr logs or `examples/` | Unit test on masking + grep of `examples/` |
-| S5 | The customer id is not in the LLM request body | Spike check |
+| S5 | The web UI keeps no customer state server-side: one conversation's lookup grants nothing in another | Authorization tests + spike check in two browser tabs |
 | S6 | A looping turn stops at the usage limit with a polite message | Agent wiring test (`FunctionModel`) |
 
 ### Delivery

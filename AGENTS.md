@@ -13,7 +13,11 @@ uv sync
 cp .env.example .env   # once it exists; holds OPENROUTER_API_KEY and MODEL
 ```
 
-There is no dev server; the app is a CLI.
+Two interfaces, once the agent exists:
+
+- Web chat UI (PydanticAI `to_web`):
+  `uv run uvicorn emporio.web:app --host 127.0.0.1 --port <port>`
+- CLI: `uv run python -m emporio.cli`
 
 ## Validation
 
