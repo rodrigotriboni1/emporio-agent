@@ -55,7 +55,7 @@ In this project, look hardest at:
   customer's order must read exactly like a missing one; the per-order failure
   counter must hold.
 - Customer PII (phone, e-mail, full name) leaking into tool outputs, logs,
-  transcripts in `exemplos/` or the LLM prompt. Logged values must be masked.
+  transcripts in `examples/` or the LLM prompt. Logged values must be masked.
 - Prompt injection: customer text must never change tool permissions or reveal
   the system prompt or internal policy notes.
 - Secrets: `OPENROUTER_API_KEY` or any `sk-or-` key in commits; `.env` stays

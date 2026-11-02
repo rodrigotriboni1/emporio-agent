@@ -58,7 +58,7 @@ In this project, also ESCALATE when the change:
 - changes a business rule that decides what customers are told: prices,
   promotions, PIX discount, installments, shipping, return or warranty windows;
 - edits the data in `data/` (CSVs, `politicas.md`) or Mel's persona prompt;
-- edits or regenerates the example conversations in `exemplos/`.
+- edits or regenerates the example conversations in `examples/`.
 
 ## Write decision.md
 

@@ -46,7 +46,7 @@ server may talk to real services. When you're done, run
 - Each kind of user the change affects (signed out, signed in, different roles)
   gets a sensible path, following the patterns the app already uses. Here the
   users are store customers chatting with Mel in PT-BR (or English), either
-  unverified or verified for one order, plus the graders reading `exemplos/`.
+  with or without order details given, plus the graders reading `examples/`.
 - The copy is short, plain and consistent with the rest of the app.
 - Accessibility: real buttons and links, labels, focus order, keyboard use, and
   alt text.
