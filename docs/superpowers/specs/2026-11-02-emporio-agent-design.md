@@ -367,8 +367,7 @@ structured-output classifier, fail-open with logging, behind a labelled eval);
 limitations (provider errors reach the web UI unformatted; holidays not
 modelled) and next steps (persistence with PII controls, RAG if the manual
 grows, MCP if another channel needs the tools, real handoff system,
-OpenTelemetry via PydanticAI's instrumentation); credit to AlvarDev/sre-genai
-for ideas (no code copied);
+OpenTelemetry via PydanticAI's instrumentation);
 AI-assistant workflow (brainstorming, grilling, Opus review agents, research
 agent, software factory, what was verified by hand); data is fictional and
 provided by the challenge; the `factory/` and `.claude/` files are GPLv3
