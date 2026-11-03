@@ -313,8 +313,8 @@ Mel can start, adding latency and cost to every message. It gives false positive
 unaccented PT-BR messages customers actually send, like "violao?". And it forces a choice
 between failing closed (a classifier outage or false positive blocks real customers) and
 failing open (an outage lets everything through, so it protected nothing). If the logs ever
-show a need, the next step would be a structured-output classifier that fails open with
-logging, behind a labelled eval set that measures its false-positive rate on real PT-BR
+show a need, the next step would be a fail-open structured-output classifier with logging,
+behind a labelled eval set that measures its false-positive rate on real PT-BR
 traffic before it gates anything.
 
 ## Limitations
