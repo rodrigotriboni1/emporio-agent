@@ -35,7 +35,7 @@ test: `uv run pytest -m live` (deselected by default, skipped without the key).
 
 ## Validation
 
-Must match `factory/checks.sh`:
+Same commands as CI:
 
 ```bash
 uv sync --frozen
@@ -74,12 +74,11 @@ Unit tests never call an LLM. Never commit `.env` or any API key.
 
 ## Software factory
 
-`/factory run` builds every open GitHub issue labeled `factory` through
-intake → spec → build → gate → review → approve, one PR per issue. State is in
-`factory/jobs/` (gitignored); `factory/bin/job` is its only writer. Checks:
-`factory/checks.sh`. Dashboard: `cd factory && python3 -m http.server`, then
-open http://localhost:8000/dashboard.html.
+The code was built with a local software factory (`factory/`, `.claude/agents/`,
+`.claude/skills/factory/`). That tooling is gitignored and not part of this repository;
+where it exists, `/factory run` builds every open GitHub issue labeled `factory` through
+intake → spec → build → gate → review → approve, one PR per issue.
 
-Each job works in its own git worktree, a full checkout of the repo at
+Each factory job works in its own git worktree, a full checkout of the repo at
 `.worktrees/<job-id>` (gitignored). A tool run from the repo root that doesn't
 read `.gitignore` sees those copies too; exclude `.worktrees/` in its config.

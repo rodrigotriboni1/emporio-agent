@@ -10,8 +10,10 @@ __pycache__/
 *.db
 handoffs.jsonl
 
-# Software factory
-/factory/jobs/
+# Software factory (local-only tooling, not part of the deliverable)
+/factory/
+/.claude/agents/
+/.claude/skills/factory/
 /.worktrees/
 
 # OS
