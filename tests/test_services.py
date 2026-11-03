@@ -110,6 +110,10 @@ def test_failures_are_identical(store):
     assert texts == {ORDER_NOT_FOUND}
 
 
+def test_overlong_id_is_generic_failure(store):
+    assert get_order(store, "9" * 5000, "x", NOW) == ORDER_NOT_FOUND
+
+
 def test_email_anchored_on_order_customer(store):
     text = get_order(store, "10", " BRUNO.MARTINS@JMAIL.COM ", NOW)
     assert text != ORDER_NOT_FOUND and text.startswith("Bruno")

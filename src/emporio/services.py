@@ -5,13 +5,14 @@ Formatting and authorization only; the rules live in domain, store and search.
 
 import json
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from emporio import search
 from emporio.domain import (
     Availability,
     OrderStatus,
+    PriceQuote,
     is_open,
     mask_pii,
     max_installments,
@@ -63,7 +64,7 @@ _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _DIGIT_RUN = re.compile(r"[+(]*\d[\d\s().+-]*\d\)?")
 
 
-def _date(value) -> str:
+def _date(value: date) -> str:
     return value.strftime("%d/%m/%Y")
 
 
@@ -71,7 +72,7 @@ def _when(moment: datetime) -> str:
     return f"{_WEEKDAYS[moment.weekday()]}, {_date(moment)} às {moment:%H:%M}"
 
 
-def _price(quote) -> str:
+def _price(quote: PriceQuote) -> str:
     if quote.percent_off is not None:
         return f"{quote.price} (de {quote.list_price}, {quote.percent_off}% off)"
     return f"{quote.price} ou {quote.pix_price} no PIX"
@@ -138,7 +139,8 @@ def _authorized(store: Store, customer_id: int, credential: str) -> bool:
 
 def get_order(store: Store, order_id: str, phone_or_email: str, now: datetime) -> str:
     order_id = order_id.strip()
-    if not re.fullmatch(r"[0-9]+", order_id):
+    # Capped at 9 digits: no order id is that long, and int() rejects strings over 4300 digits.
+    if not re.fullmatch(r"[0-9]{1,9}", order_id):
         return ORDER_NOT_FOUND
     number = int(order_id)
     if _failures.get(number, 0) >= _MAX_FAILURES:
