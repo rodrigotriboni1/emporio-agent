@@ -65,7 +65,8 @@ LangChain/LangGraph (more concepts, OpenRouter package in beta).
 
 ### Default model
 
-Chosen by a ~1 hour spike before any agent code: ~8 scripted prompts (price,
+Chosen by a ~1 hour spike run on the real agent once it exists (PRD US-007),
+so the measurements reflect the actual tools and prompt: ~8 scripted prompts (price,
 catalog with ceiling, hours, return, accessory, off-topic, injection, order
 without verification) against Gemini Flash, Claude Sonnet and DeepSeek on
 OpenRouter. Record per model: right tool called, valid args, LLM calls per
