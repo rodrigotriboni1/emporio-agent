@@ -334,6 +334,31 @@ traffic before it gates anything.
 - The manual's return exclusions (custom setups, "venda final", mouthpieces) have no data flag,
   so Mel states them as conditions instead of checking them.
 
+## Scaling
+
+The prototype is not built for scale, because the brief asks for a prototype and scale nobody
+needs yet is cost without benefit. It is built so that scaling swaps one layer at a time: the
+rules live in `domain.py`, data enters only through `store.py`, and the four tools are the
+contract with the model. Each growth axis below changes one layer and keeps the rest, and each
+change waits for a measured bottleneck.
+
+| Growth axis | Bottleneck today | What changes | What stays |
+|---|---|---|---|
+| Catalog (65 → 100k products) | CSVs in memory, `difflib` search | `store.py` reads Postgres; search becomes hybrid (full-text for names and models, embeddings for "a good beginner guitar") | `domain.py`, the `search_products` signature, the prompt |
+| Knowledge (one manual → many documents, FAQs, tickets) | `get_policy` serves 9 fixed topics | RAG enters here: chunks by section with metadata, hybrid retrieval and reranking, answers still cite their source | "Only answer from a source" |
+| Traffic (many concurrent customers) | Failure lock and handoffs in process memory and a file | Verification is already stateless, so the app scales horizontally; the lock moves to Redis with a TTL plus rate limiting; handoffs go to a queue or ticketing system | Tools, prompt, rules |
+| Domains (4 → 30 tools: sales, post-sale, billing, tech support) | One agent with many tools starts picking the wrong one | Multi-agent enters here: a cheap router in front of specialists, each with a few tools and its own prompt (or, first, filtering tools by intent), triggered when the spike harness shows tool accuracy dropping | Specialists reuse the same `services` |
+| Channels (real WhatsApp, Instagram, website) | Local CLI and web UI only | The agent sits behind a webhook API with one adapter per channel; the tools are also exposed as an MCP server for the back office | The agent itself |
+| Multiple stores | One store's data and persona | A tenant id in `deps`, data filtered per tenant, persona and manual per store | The rule code |
+| Quality and cost | Spike and scenarios run by hand, once | Scenarios become a scheduled regression suite with repeated runs and pass rates; OpenTelemetry traces per tool, tokens and cost per conversation; model routing (cheap model for simple turns, stronger one for hard cases) | The spike and scenario harness |
+
+The persona already places Mel on the store's WhatsApp channel (manual section 7), but the
+prototype does not connect to WhatsApp. Doing so changes two design points: WhatsApp does not
+resend the conversation, so history has to be stored server-side per phone number (encrypted,
+with retention, for LGPD); and the sender's phone number arrives verified by the channel, so it
+can serve as the order credential when it matches the order's customer, while the e-mail path
+stays for other cases.
+
 ## Next steps
 
 - Persistence for conversations and handoffs, with PII controls (encryption, retention,
