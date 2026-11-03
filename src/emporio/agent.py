@@ -165,9 +165,10 @@ def get_order(ctx: RunContext[Deps], order_id: str, phone_or_email: str) -> str:
 def handoff_to_human(ctx: RunContext[Deps], reason: str, summary: str) -> str:
     """Hand the conversation to the human team and return a protocol number.
 
-    Use to close a purchase, for complaints, for return or exchange cases, when the order
-    lookup is locked, when data conflicts, or when the customer asks for a person. Do NOT use
-    for questions another tool answers. `reason` and `summary` are short free text.
+    Call only after the customer agrees to be forwarded, or asks for a person: to close a
+    purchase, for complaints, for return or exchange cases, when the order lookup is locked, or
+    when data conflicts. Do NOT use for questions another tool answers. `reason` and `summary`
+    are short free text.
     """
     return services.handoff_to_human(
         STORE, reason, summary, ctx.deps.now(), path=services.HANDOFFS_PATH
