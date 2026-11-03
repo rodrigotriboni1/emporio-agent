@@ -43,6 +43,9 @@ Unit tests never call an LLM. Never commit `.env` or any API key.
   load-time invariants; it imports only `domain`.
 - `src/emporio/search.py` is the deterministic product search over the `Store`;
   it imports only `domain` and `store`.
+- `src/emporio/services.py` holds the use cases behind Mel's tools: it returns
+  PT-BR text, enforces order authorization and PII masking, and imports only
+  `domain`, `store` and `search`.
 - Conventional Commits. Never push to `main`; work on a branch and open a PR.
   PRs merge with a merge commit, never squash.
 
