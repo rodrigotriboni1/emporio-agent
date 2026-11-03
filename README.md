@@ -11,6 +11,31 @@
   WhatsApp channel off by default. "All responses in English" was read as code, docs and this
   README in English, while Mel answers customers in their language (PT-BR by default).
 
+## Approach
+
+The order in which the problem was worked, each step linked to where it is detailed:
+
+1. **Read the material before writing code.** The brief, the manual and the CSVs disagree in 20
+   places; each got one documented assumption ([Data inconsistencies](#data-inconsistencies)), and the
+   manual was transcribed once into `data/politicas.md` instead of being parsed at runtime.
+2. **Decide what the model must not do.** Prices, installments, return windows, opening hours and
+   order access must be exact, so they live in plain, unit-tested code (`domain.py`, `services.py`).
+   The model only picks one of four tools and phrases the answer. That ruled out RAG and text-to-SQL
+   ([Decisions](#decisions)).
+3. **Treat identity as a security boundary.** Order data needs the order number plus that customer's
+   phone or e-mail on every call, and nothing about a customer is kept between calls.
+4. **Choose by evidence.** The framework came from a sourced comparison
+   (`docs/research/2026-11-02-python-agent-framework.md`); the model from a live comparison with
+   the selection rule fixed before the run ([Spike results](#spike-results)).
+5. **Make behaviour checkable.** Scripted scenarios run on the real model with automatic checks
+   (tools called, every `R$` amount traced to a tool, no leaks), and only a passing run writes the
+   [example conversations](#example-conversations).
+6. **Review against the brief, then fix.** Two independent evaluations against the challenge
+   criteria found real gaps (a masked protocol number, unrequested handoffs, a wrong opening-hours
+   sentence, a hard-to-read README), each fixed before delivery.
+7. **Keep extras optional.** The core is one agent and four tools; the WhatsApp channel is off by
+   default ([Optional extra](#optional-extra-whatsapp-channel)).
+
 ## Quickstart
 
 With [uv](https://docs.astral.sh/uv/) and Python 3.12 (`.python-version`), run `uv sync` and
