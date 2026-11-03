@@ -9,16 +9,27 @@ from datetime import datetime
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.capabilities import Hooks
 from pydantic_ai.exceptions import SkipModelRequest
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.messages import (
+    BaseToolCallPart,
+    BaseToolReturnPart,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+)
 
-from emporio import prompt, services
+from emporio import config, prompt, services
 from emporio.store import load_store
 
 MAX_INPUT_CHARS = 2000
+MAX_HISTORY_CHARS = 40_000
 MAX_REQUESTS = 10
 LOG_ARG_CHARS = 256
 
 INPUT_TOO_LONG = "Sua mensagem ficou muito longa. Pode enviar uma versão mais curta, por favor?"
+HISTORY_TOO_LONG = (
+    "Nossa conversa ficou muito longa. Por favor, comece uma nova conversa para continuar."
+)
 TURN_LIMIT_REACHED = (
     "Não consegui concluir seu atendimento agora. Fale com a nossa equipe pelo WhatsApp "
     "(67) 3321-4500, de segunda a sexta das 9h às 18h e aos sábados das 9h às 13h."
@@ -32,16 +43,37 @@ class Deps:
     now: Callable[[], datetime]
 
 
+def _prompt_text(part: UserPromptPart) -> str:
+    content = part.content
+    if isinstance(content, str):
+        return content
+    return "".join(c for c in content if isinstance(c, str))
+
+
 def _last_user_text(messages: list) -> str:
     for message in reversed(messages):
         if isinstance(message, ModelRequest):
             for part in reversed(message.parts):
                 if isinstance(part, UserPromptPart):
-                    content = part.content
-                    if isinstance(content, str):
-                        return content
-                    return "".join(c for c in content if isinstance(c, str))
+                    return _prompt_text(part)
     return ""
+
+
+def _part_chars(part) -> int:
+    # The browser sends the whole history each turn, so tool calls and returns count too.
+    if isinstance(part, UserPromptPart):
+        return len(_prompt_text(part))
+    if isinstance(part, TextPart):
+        return len(part.content)
+    if isinstance(part, BaseToolCallPart):
+        return len(part.args_as_json_str())
+    if isinstance(part, BaseToolReturnPart):
+        return len(part.model_response_str())
+    return 0
+
+
+def _history_chars(messages: list) -> int:
+    return sum(_part_chars(part) for message in messages for part in message.parts)
 
 
 hooks = Hooks()
@@ -52,6 +84,8 @@ def _limits(ctx: RunContext[Deps], request_context):
     # Limit texts are the run's output, not errors: the web UI shows str(error), the CLI hides it.
     if len(_last_user_text(request_context.messages)) > MAX_INPUT_CHARS:
         raise SkipModelRequest(ModelResponse(parts=[TextPart(INPUT_TOO_LONG)]))
+    if _history_chars(request_context.messages) > MAX_HISTORY_CHARS:
+        raise SkipModelRequest(ModelResponse(parts=[TextPart(HISTORY_TOO_LONG)]))
     if ctx.usage.requests >= MAX_REQUESTS:
         raise SkipModelRequest(ModelResponse(parts=[TextPart(TURN_LIMIT_REACHED)]))
     return request_context
@@ -80,6 +114,7 @@ def _log_usage(ctx: RunContext[Deps], *, result):
     return result
 
 
+config.load_dotenv()
 agent = Agent(
     os.environ.get("MODEL", "openrouter:google/gemini-3.8-flash"),
     deps_type=Deps,
