@@ -27,6 +27,12 @@ OpenRouter, so it spends credits and never runs in CI. Source the key from the m
 checkout's `.env` first (`set -a; source <main checkout>/.env; set +a`). It writes
 `docs/spike-results.md`, which is generated and never edited by hand.
 
+Scenarios: `uv run python scripts/scenarios.py` runs Mel's six scripted conversations live
+on the default model and checks them, so it spends credits and never runs in CI. Source the
+key from the main checkout's `.env` the same way. It writes `examples/01-…` to `05-…` for
+the scenarios that pass; they are generated and never edited by hand. The same run as a
+test: `uv run pytest -m live` (deselected by default, skipped without the key).
+
 ## Validation
 
 Must match `factory/checks.sh`:
