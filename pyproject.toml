@@ -23,6 +23,8 @@ packages = ["src/emporio"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["live: calls the real LLM via OpenRouter; run with -m live"]
+addopts = "-m 'not live'"
 
 [tool.ruff]
 line-length = 100
