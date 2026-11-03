@@ -10,13 +10,16 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 (`.python-version`).
 
 ```bash
 uv sync
-cp .env.example .env   # once it exists; holds OPENROUTER_API_KEY and MODEL
+cp .env.example .env   # holds OPENROUTER_API_KEY, MODEL and EMPORIO_NOW
 ```
 
-Two interfaces, once the agent exists:
+`EMPORIO_NOW` sets the store clock: ISO 8601 with offset (default
+`2026-03-25T10:00-04:00`) or `now` for the real clock at `-04:00`.
+
+Two interfaces, run from the repo root (both read `.env` there):
 
 - Web chat UI (PydanticAI `to_web`):
-  `uv run uvicorn emporio.web:app --host 127.0.0.1 --port <port>`
+  `uv run uvicorn emporio.web:app --host 127.0.0.1 --port 7932`
 - CLI: `uv run python -m emporio.cli`
 
 ## Validation
@@ -48,9 +51,13 @@ Unit tests never call an LLM. Never commit `.env` or any API key.
   `domain`, `store` and `search`.
 - `src/emporio/agent.py` is the only module that imports PydanticAI. Its four tools are
   thin wrappers over `services`; `deps` holds only the clock; one `Hooks` capability holds
-  the input and request limits and the stderr logging.
+  the input, conversation and request limits and the stderr logging.
 - `src/emporio/prompt.py` holds Mel's instructions, written in English and telling Mel to
   reply in PT-BR, in sections F1 to F4. It does not import PydanticAI.
+- `src/emporio/config.py` is stdlib only: it loads `.env` (real env vars win) and turns
+  `EMPORIO_NOW` into the clock in `Deps`.
+- `src/emporio/web.py` and `src/emporio/cli.py` are thin entry points over `agent` and `Deps`;
+  they do not import PydanticAI.
 - Conventional Commits. Never push to `main`; work on a branch and open a PR.
   PRs merge with a merge commit, never squash.
 
