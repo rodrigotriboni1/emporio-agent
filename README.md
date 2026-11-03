@@ -7,8 +7,9 @@ of scope. One PydanticAI agent, four tools, everything else in plain Python.
 
 ![Mel in the web chat: a catalog search, opening hours, an order lookup and an out-of-scope question](docs/mel-demo.gif)
 
-*Recorded on the real model (DeepSeek V4.1 Flash) in the built-in web chat, with the store clock
-at its default date. Each caption names the tool Mel called.*
+*A continuous 42-second recording on the real model (DeepSeek V4.1 Flash) in the built-in web chat,
+with the store clock at its default date: each turn shows the tool Mel called and, while the reply
+streams, the model's short reasoning. Also as video: [`docs/mel-demo.mp4`](docs/mel-demo.mp4).*
 
 ## Run it
 
