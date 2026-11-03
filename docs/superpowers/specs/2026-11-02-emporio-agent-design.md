@@ -1,5 +1,7 @@
 # Empório da Música customer-service agent — design spec
 
+> Planning document written before implementation. Where it differs from the code, the README is authoritative.
+
 - Date: 2026-11-02
 - Status: approved in brainstorming + two grilling rounds; implemented in this repository
 - Deadline: Wednesday 2026-11-04 23:59 BRT (hard cut: no push or PR after it)

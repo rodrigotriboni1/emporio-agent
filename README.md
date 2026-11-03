@@ -5,9 +5,11 @@
 - Mel is a text customer-service agent for Empório da Música, a fictional instrument store in Campo
   Grande/MS: store persona, PT-BR (or English) replies, polite refusal of out-of-scope requests.
 - One PydanticAI agent, four deterministic tools (product search, policy section, order lookup,
-  handoff): every price, stock figure, deadline and order fact comes from a tool, never the model.
+  handoff). The tools compute every price, stock figure, deadline and order fact; the prompt forbids
+  stating one without a tool result, and the scenario checks trace every `R$` amount to a tool.
 - "The simplest way possible" was read as that minimal core, with optional extras such as the
-  WhatsApp channel off by default.
+  WhatsApp channel off by default. "All responses in English" was read as code, docs and this
+  README in English, while Mel answers customers in their language (PT-BR by default).
 
 ## Quickstart
 
@@ -175,6 +177,11 @@ erDiagram
   whole section, routed by exact topic, with no similarity ranking to get wrong. Chunking could
   split linked rules: the section 3 installment table and the section 3.1 tiers that override it
   are both in `[payment]`. Products and orders go through deterministic filters, no embeddings.
+- **Policy manual: transcribed once, not parsed at runtime.** `data/politicas_da_loja.pdf` was
+  transcribed by hand into `data/politicas.md` (kept in Portuguese, the store's own text) with the
+  `## [topic]` tags `get_policy` uses. Where the PDF contradicts itself, the transcription keeps one
+  value with a `> Note:` saying why (see Data inconsistencies). Clean, versioned text beats PDF
+  extraction at runtime, and each conflict is resolved once, in review, instead of by the model.
 - **Price ceiling.** `max_price` compares against the lowest payable price: the PIX price, or the
   promotional price when a promotion is active (PIX does not stack on it). So in
   `examples/01-catalog-search.md` the R$ 1.049,00 guitar (R$ 996,55 via PIX) is "até R$ 1000".
