@@ -198,13 +198,23 @@ def check_emoji(turns: list[Turn]) -> list[str]:
     return failures
 
 
+# The scenarios use this one: the emoji rule is now "at most one per reply", in any position.
+# check_emoji stays because a protected test still covers it.
+def check_emoji_count(turns: list[Turn]) -> list[str]:
+    return [
+        f"turn {n}: {len(found)} emoji in one reply"
+        for n, turn in enumerate(turns, 1)
+        if len(found := EMOJI.findall(turn.reply)) > 1
+    ]
+
+
 COMMON_CHECKS = [
     check_grounding,
     check_order_facts,
     check_forbidden,
     check_prompt_leak,
     check_slogan,
-    check_emoji,
+    check_emoji_count,
 ]
 
 
