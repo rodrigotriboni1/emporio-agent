@@ -5,6 +5,11 @@ Campo Grande/MS. She keeps the store's persona, answers only from the store's da
 manual, knows when to look up data and when to read a policy, and politely turns away anything out
 of scope. One PydanticAI agent, four tools, everything else in plain Python.
 
+![Mel in the web chat: a catalog search, opening hours, an order lookup and an out-of-scope question](docs/mel-demo.gif)
+
+*Recorded on the real model (DeepSeek V4.1 Flash) in the built-in web chat, with the store clock
+at its default date. Each caption names the tool Mel called.*
+
 ## Run it
 
 Needs [uv](https://docs.astral.sh/uv/) and Python 3.12.
