@@ -127,8 +127,9 @@ Derived, never stored: effective price, PIX price, max installments,
 availability, return/warranty windows.
 
 Load-time invariants (fail fast): every foreign key resolves; at most one
-active promotion per product; row counts 65 products, 50 customers, 20 orders,
-25 promotions. Known data inconsistencies (section 13) are asserted by a test
+active promotion per product. The row counts (65 products, 50 customers, 20
+orders, 25 promotions) are asserted by a test on the real data, not at load.
+Known data inconsistencies (section 13) are asserted by a test
 so the README table stays true to the data.
 
 The README gets a Mermaid ER diagram:
