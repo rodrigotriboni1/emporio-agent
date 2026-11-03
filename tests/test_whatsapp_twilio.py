@@ -1,12 +1,21 @@
 import asyncio
+import contextlib
 import importlib
+import urllib.parse
+import urllib.request
 
 import pytest
+from pydantic_ai import models
+from pydantic_ai.messages import ModelResponse, TextPart
+from pydantic_ai.models.function import FunctionModel
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
-from emporio import web, whatsapp_twilio
+from emporio import web, whatsapp_app
+from emporio.agent import agent
 from emporio.whatsapp_twilio import ENV_KEYS, Twilio, from_env, twilio_signature
+
+models.ALLOW_MODEL_REQUESTS = False
 
 
 def test_signature_matches_twilio_sdk_vector():
@@ -76,19 +85,35 @@ def test_from_env_builds_the_channel(monkeypatch):
     assert from_env() == TWILIO
 
 
-def test_route_exists_only_when_configured(monkeypatch):
+def test_webhook_app_serves_only_the_webhook(monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        urllib.request, "urlopen", lambda r, timeout: sent.append(r) or contextlib.nullcontext()
+    )
+    params = [("From", "whatsapp:+5511"), ("MessageSid", "SM1"), ("Body", "oi"), ("NumMedia", "0")]
+    headers = {"X-Twilio-Signature": twilio_signature(TWILIO.webhook_url, params, "token")}
+    body = urllib.parse.urlencode(params)
+    reply = FunctionModel(lambda m, i: ModelResponse(parts=[TextPart("ok")]))
     try:
         for key in ENV_KEYS:
             monkeypatch.delenv(key, raising=False)
-        importlib.reload(web)
-        assert TestClient(web.app).post("/whatsapp/twilio").status_code == 404
+        importlib.reload(whatsapp_app)
+        assert TestClient(whatsapp_app.app).post("/whatsapp/twilio").status_code == 404
 
         _set_env(monkeypatch)
+        importlib.reload(whatsapp_app)
+        client = TestClient(whatsapp_app.app)
+        assert client.get("/").status_code == 404  # no chat UI on the exposed port
+        assert client.post("/whatsapp/twilio").status_code == 403
+        with agent.override(model=reply):
+            response = client.post("/whatsapp/twilio", content=body, headers=headers)
+        assert response.status_code == 200 and len(sent) == 1
+
+        # The chat UI app never serves the webhook, even when Twilio is configured.
         importlib.reload(web)
-        assert isinstance(web.twilio, whatsapp_twilio.Twilio)
-        # The route exists: an unsigned POST is refused by the signature check, not unrouted.
-        assert TestClient(web.app).post("/whatsapp/twilio").status_code == 403
+        assert TestClient(web.app).post("/whatsapp/twilio").status_code == 404
     finally:
         for key in ENV_KEYS:
             monkeypatch.delenv(key, raising=False)
+        importlib.reload(whatsapp_app)
         importlib.reload(web)
