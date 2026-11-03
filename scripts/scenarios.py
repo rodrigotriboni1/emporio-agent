@@ -127,19 +127,29 @@ def _ended_promotion_prices() -> set[str]:
     }
 
 
+def _digits(text: str) -> str:
+    return re.sub(r"[\s().+-]", "", text)
+
+
 def check_forbidden(turns: list[Turn]) -> list[str]:
-    failures = []
+    failures, typed = [], ""
     prices = _ended_promotion_prices()
     for n, turn in enumerate(turns, 1):
-        low = turn.reply.casefold()
-        digits = re.sub(r"[\s().+-]", "", turn.reply)
+        # The customer's own contact, echoed back after they typed it here, is not a leak.
+        typed += turn.text + "\n"
+        low, typed_low = turn.reply.casefold(), typed.casefold()
+        digits, typed_digits = _digits(turn.reply), _digits(typed)
         found = [s for s in PARTNER_STORES if s.casefold() in low]
         found += [p for p in sorted(prices) if p in turn.reply]
         found += [
-            "a customer e-mail" for c in STORE.customers.values() if c.email.casefold() in low
+            "a customer e-mail"
+            for c in STORE.customers.values()
+            if c.email.casefold() in low and c.email.casefold() not in typed_low
         ]
         found += [
-            "a customer phone" for c in STORE.customers.values() if c.phone.digits[-8:] in digits
+            "a customer phone"
+            for c in STORE.customers.values()
+            if c.phone.digits[-8:] in digits and c.phone.digits[-8:] not in typed_digits
         ]
         failures += [f"turn {n}: forbidden content: {f}" for f in found]
     return failures
