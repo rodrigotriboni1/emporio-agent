@@ -177,7 +177,7 @@ the model reads the tool docstrings (each says when to use the tool and when not
 |---|---|
 | `search_products(query, category, max_price)` | Catalog, price, stock and installments. Up to 8 items, available first; a single match returns full detail (specs, promotion or ended promotion, PIX price, max installments). |
 | `get_policy(topic)` | One section of `data/politicas.md` (`contact`, `hours`, `payment`, `returns`, `warranty`, `shipping`, `promotions`, `privacy`, `scope`); `hours` also says whether the store is open now and when it next opens. |
-| `get_order(order_id, phone_or_email)` | Checks the credentials on every call, then explains the order's status, tracking, delay and return and warranty windows. Any failure reads like a missing order. |
+| `get_order(order_id, phone_or_email)` | Checks the credentials on every call, then explains the order's status, tracking, delay and return and warranty windows. A wrong credential or another customer's order reads like a missing order; after 5 failures the order is locked and Mel offers a human. |
 | `handoff_to_human(reason, summary)` | Returns a protocol number and appends to `handoffs.jsonl` (gitignored), with PII masked. |
 
 A single `Hooks` capability on the `Agent` guards the loop, so the same limits hold in the CLI,
@@ -274,9 +274,9 @@ multiple of 512) and kept the request limit at 10 (the largest turn used 3).
 
 ## Data inconsistencies
 
-The manual and the CSVs disagree in places. Each inconsistency below is asserted by
-`tests/test_store.py` (data) or noted in `data/politicas.md` (manual), so this table stays true
-to the data.
+The manual and the CSVs disagree in places. Most rows below are asserted by
+`tests/test_store.py` (data) or noted in `data/politicas.md` (manual); the products 135–144 row
+is visible only in the data.
 
 | Inconsistency | Adopted assumption |
 |---|---|
@@ -305,10 +305,11 @@ to the data.
 
 A separate model that classifies each customer message (off-topic, injection, abuse) before
 Mel sees it was considered and rejected. What it would protect is already enforced in code:
-order data needs valid credentials in the same `get_order` call, no tool writes anything or
-accepts a customer id, tools never return a phone, e-mail or full name, and the `Hooks` capability
-caps input size, requests per turn and conversation length, so a successful injection can at
-worst produce an off-brand reply. It would add one more model call per turn, in series, before
+order data needs valid credentials in the same `get_order` call, no tool changes order or
+customer data or accepts a customer id (the only write is the handoff record), tools never
+return a customer's phone, e-mail or full name, and the `Hooks` capability caps input size,
+requests per turn and conversation length, so a successful injection can at worst produce an
+off-brand reply or a spurious handoff record. It would add one more model call per turn, in series, before
 Mel can start, adding latency and cost to every message. It gives false positives on the short,
 unaccented PT-BR messages customers actually send, like "violao?". And it forces a choice
 between failing closed (a classifier outage or false positive blocks real customers) and
