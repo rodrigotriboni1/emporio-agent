@@ -13,6 +13,7 @@ from emporio.domain import (
     Availability,
     OrderStatus,
     PriceQuote,
+    _fold,
     is_open,
     mask_pii,
     max_installments,
@@ -36,6 +37,8 @@ _MAX_FAILURES = 5
 # Failed lookups per numeric order id; lives until the process restarts (S3).
 # shortcut: no thread lock, so a concurrent race allows a few extra tries; add one if served
 # by a multi-threaded server.
+# Known prototype limitation: anyone can lock a real order with 5 wrong tries until restart;
+# the lock text offers a human.
 _failures: dict[int, int] = {}
 
 _LABELS = {
@@ -60,7 +63,7 @@ _WEEKDAYS = (
     "sábado",
     "domingo",
 )
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_EMAIL = re.compile(r"[\w.+-]+[ \t]*@[ \t]*[\w-]+(?:\.[\w-]+)+")
 _DIGIT_RUN = re.compile(r"[+(]*\d[\d\s().+-]*\d\)?")
 
 
@@ -191,16 +194,27 @@ def get_order(store: Store, order_id: str, phone_or_email: str, now: datetime) -
 
 
 def mask_text(store: Store, text: str) -> str:
-    text = _EMAIL.sub(lambda m: mask_pii(m.group()), text)
+    text = _EMAIL.sub(lambda m: mask_pii(re.sub(r"\s", "", m.group())), text)
     text = _DIGIT_RUN.sub(
         lambda m: mask_pii(m.group()) if sum(c.isdigit() for c in m.group()) >= 8 else m.group(),
         text,
     )
-    # shortcut: case-insensitive only, not accent-insensitive; fold accents if the model rewrites
-    # names.
     for name in sorted({c.name for c in store.customers.values()}, key=len, reverse=True):
-        pattern = re.compile(rf"\b{re.escape(name)}\b", re.IGNORECASE)
-        text = pattern.sub(f"{name.split()[0]} ***", text)
+        text = _mask_name(text, name)
+    return text
+
+
+def _mask_name(text: str, name: str) -> str:
+    # Match on the folded text (no accents, casefolded) and map each hit back to the original.
+    folded, index = "", []
+    for i, char in enumerate(text):
+        piece = char if char.isspace() else _fold(char)
+        folded += piece
+        index += [i] * len(piece)
+    pattern = r"\s+".join(re.escape(word) for word in _fold(name).split())
+    for match in reversed(list(re.finditer(rf"\b{pattern}\b", folded))):
+        end = index[match.end()] if match.end() < len(index) else len(text)
+        text = text[: index[match.start()]] + f"{name.split()[0]} ***" + text[end:]
     return text
 
 

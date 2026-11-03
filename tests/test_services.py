@@ -181,6 +181,36 @@ def test_mask_text(store):
     assert mask_text(store, kept) == kept
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Letícia Gonçalves Rocha",
+        "LETICIA GONCALVES ROCHA",
+        "leticia gonçalves rocha",
+        "Letícia  Gonçalves\nRocha",
+    ],
+)
+def test_mask_text_name_ignores_accents_and_case(store, name):
+    assert mask_text(store, f"Falar com {name}, por favor") == "Falar com Letícia ***, por favor"
+
+
+@pytest.mark.parametrize("email", ["ana @ gmail.com", "ana@ gmail.com", "ana @gmail.com"])
+def test_mask_text_email_with_spaces(store, email):
+    assert mask_text(store, f"e-mail {email} ok") == "e-mail a***@gmail.com ok"
+
+
+def test_handoff_masks_unaccented_name_and_spaced_email(store, tmp_path):
+    path = tmp_path / "handoffs.jsonl"
+    handoff_to_human(
+        store, "LETICIA GONCALVES ROCHA quer troca", "contato leticia.rocha @ jmail.com", NOW, path
+    )
+    written = path.read_text(encoding="utf-8")
+    record = json.loads(written)
+    assert record["reason"] == "Letícia *** quer troca"
+    assert record["summary"] == "contato l***@jmail.com"
+    assert "GONCALVES" not in written and "leticia.rocha" not in written
+
+
 def test_mask_text_longest_name_first(store):
     assert mask_text(store, "bruno carvalho martins") == "Bruno ***"
 
