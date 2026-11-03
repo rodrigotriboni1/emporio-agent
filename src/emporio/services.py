@@ -14,6 +14,7 @@ from emporio.domain import (
     OrderStatus,
     PriceQuote,
     _fold,
+    closes_at,
     is_open,
     mask_pii,
     max_installments,
@@ -130,8 +131,11 @@ def get_policy(store: Store, topic: str, now: datetime) -> str:
         return f"Tópico desconhecido. Tópicos válidos: {', '.join(store.policies)}."
     text = store.policies[topic]
     if topic == "hours":
-        state = "abertos" if is_open(now) else "fechados"
-        text += f"\n\nAgora estamos {state}. Próxima abertura: {_when(next_opening(now))}."
+        closing = closes_at(now)
+        if closing is not None:
+            text += f"\n\nAgora estamos abertos até as {closing:%H:%M}."
+        else:
+            text += f"\n\nAgora estamos fechados. Próxima abertura: {_when(next_opening(now))}."
     return text
 
 

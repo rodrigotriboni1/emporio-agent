@@ -37,4 +37,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Here, not in main(): the tests drive main() without a key.
+    if not os.environ.get("OPENROUTER_API_KEY", "").strip():
+        sys.exit("OPENROUTER_API_KEY is not set. Add it to .env (see .env.example).")
     main()

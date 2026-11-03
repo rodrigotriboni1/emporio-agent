@@ -245,6 +245,10 @@ def is_open(now: datetime) -> bool:
     return hours is not None and hours[0] <= now.time() < hours[1]
 
 
+def closes_at(now: datetime) -> time | None:
+    return _HOURS[now.weekday()][1] if is_open(now) else None
+
+
 def next_opening(now: datetime) -> datetime:
     # Strictly after `now`, so a call while open gives the next day's opening.
     for offset in range(8):
