@@ -41,6 +41,15 @@ REPLY_AMOUNT = re.compile(r"R\$\s?[\d.]+,\d{2}")
 SOURCE_AMOUNT = re.compile(r"R\$\s?(\d+(?:\.\d{3})*)(?:,(\d{2}))?")
 LEAK_WORDS = 8
 SLOGAN = "sua música começa aqui"
+SALES_OFFER = re.compile(
+    r"(fechar|finalizar|concluir|efetuar|efetivar) (a|sua|essa|esta) (compra|venda)",
+    re.IGNORECASE,
+)
+BUYING_INTENT = re.compile(
+    r"\b(quero|queria|gostaria de|vou) (comprar|levar|fechar)|como (eu )?(faço|faco|posso) "
+    r"(para |pra )?comprar|reserv",
+    re.IGNORECASE,
+)
 # shortcut: common pictograph blocks only, and a flag counts as two; widen if Mel uses others.
 _PICTO = "[\U0001f000-\U0001faff⌀-⏿☀-➿⬀-⯿]"
 EMOJI = re.compile(rf"{_PICTO}[️\U0001f3fb-\U0001f3ff]*(?:‍{_PICTO}[️]*)*")
@@ -314,8 +323,26 @@ def check_policies(turns: list[Turn]) -> list[str]:
     return [f"get_policy not called for {sorted(missing)}"] if missing else []
 
 
+def check_sales_offer(turns: list[Turn]) -> list[str]:
+    failures, offered = [], False
+    for n, turn in enumerate(turns, 1):
+        if not SALES_OFFER.search(turn.reply):
+            continue
+        if not BUYING_INTENT.search(turn.text):
+            failures.append(f"turn {n}: sales offer without buying intent")
+        if offered:
+            failures.append(f"turn {n}: sales offer repeated")
+        offered = True
+    return failures
+
+
 def check_price_and_store_info(turns: list[Turn]) -> list[str]:
-    return check_price(turns) + check_policies(turns) + check_no_handoff(turns)
+    return (
+        check_price(turns)
+        + check_policies(turns)
+        + check_no_handoff(turns)
+        + check_sales_offer(turns)
+    )
 
 
 def scenarios() -> list[Scenario]:
