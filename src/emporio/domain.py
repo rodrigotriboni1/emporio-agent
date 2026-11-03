@@ -68,6 +68,10 @@ class Phone:
         digits = Phone.parse(raw).digits
         return len(digits) >= 8 and digits[-8:] == self.digits[-8:]
 
+    def __repr__(self) -> str:
+        # Masked so a logged Phone never leaks the full number (S4); str() uses this too.
+        return f"Phone({mask_pii(self.digits)!r})"
+
 
 @dataclass(frozen=True)
 class Payment:

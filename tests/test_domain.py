@@ -174,6 +174,13 @@ def test_mask_pii():
     assert mask_pii("12") == "***"
 
 
+def test_phone_repr_and_str_are_masked():
+    phone = Phone.parse("(67) 99812-3456")
+    assert repr(phone) == "Phone('***3456')"
+    assert str(phone) == "Phone('***3456')"
+    assert f"{phone}" == "Phone('***3456')"
+
+
 def test_customer_repr_hides_pii():
     customer = Customer(
         1, "Lucas Mendes", Phone.parse("(67) 99812-3456"), "lucas.mendes@jmail.com", "Campo Grande"
