@@ -1,5 +1,8 @@
 # PRD: Mel, the Empório da Música customer-service agent
 
+> Note: the software factory tooling (`/factory run`) and `factory/checks.sh` are not in this
+> repository. The equivalent validation commands are the ones in README's Quickstart.
+
 - Source of truth for behaviour: `docs/superpowers/specs/2026-11-02-emporio-agent-design.md`
   (cited below as "spec §N"). This PRD slices it into stories; where the two
   differ, the spec wins. One ordering change was folded back into the spec:
