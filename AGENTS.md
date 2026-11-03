@@ -72,12 +72,15 @@ Unit tests never call an LLM. Never commit `.env` or any API key.
 - `src/emporio/config.py` is stdlib only: it loads `.env` (real env vars win) and turns
   `EMPORIO_NOW` into the clock in `Deps`.
 - `src/emporio/web.py` and `src/emporio/cli.py` are thin entry points over `agent` and `Deps`;
-  they do not import PydanticAI. `web.py` adds the `POST /whatsapp/twilio` route only when all
-  four `TWILIO_*` env vars are set.
+  they do not import PydanticAI.
+- `src/emporio/whatsapp_app.py` is the webhook-only app (`uvicorn emporio.whatsapp_app:app`): it
+  serves `POST /whatsapp/twilio` when all four `TWILIO_*` env vars are set and nothing else. It
+  is the only app to expose through a tunnel; never tunnel the `web.py` chat UI.
 - `src/emporio/whatsapp.py` is the shared WhatsApp channel core and holds the `Channel` port
   (the one `Protocol` in the code): in-memory history, dedupe, per-user locks, formatting and
-  one agent turn per message. It does not import PydanticAI, and every log line that can hold a
-  phone goes through `services.mask_text`.
+  one agent turn per message. It answers 413 to a body over 64 KB before the signature check. It
+  does not import PydanticAI, and every log line that can hold a phone goes through
+  `services.mask_text`.
 - `src/emporio/whatsapp_twilio.py` is the Twilio adapter: it imports only the stdlib, Starlette
   and `whatsapp`, and checks the signature against `TWILIO_WEBHOOK_URL`, never `request.url`.
 - Conventional Commits. Never push to `main`; work on a branch and open a PR.

@@ -61,10 +61,12 @@ uv run --frozen pytest -q
 
 ## WhatsApp channel
 
-Mel can also answer on WhatsApp through Twilio. The route `POST /whatsapp/twilio` exists on the
-web server only when the four `TWILIO_*` variables in `.env` are all set; otherwise it answers
-404. On each incoming message it:
+Mel can also answer on WhatsApp through Twilio. The webhook runs as its own app,
+`emporio.whatsapp_app`, separate from the chat UI. It serves only `POST /whatsapp/twilio`, and
+only when the four `TWILIO_*` variables in `.env` are all set; otherwise it answers 404. On each
+incoming message it:
 
+- answers 413 to a body over 64 KB, before reading the rest and before the signature check;
 - checks the `X-Twilio-Signature` header (HMAC-SHA1 over `TWILIO_WEBHOOK_URL` and every form
   field) and answers 403 on a bad or missing signature;
 - acknowledges at once with an empty `<Response/>`, ignoring a repeated `MessageSid`, then runs
@@ -84,8 +86,13 @@ Connecting the Twilio Sandbox:
 
 1. In the Twilio Console, open the WhatsApp Sandbox and send `join <code>` from your phone to
    the Sandbox number.
-2. Run the web server (`uv run uvicorn emporio.web:app --host 127.0.0.1 --port 7932`) and expose
-   that port through an HTTPS tunnel (any tunnel tool).
+2. Run the webhook app on its own port
+   (`uv run uvicorn emporio.whatsapp_app:app --host 127.0.0.1 --port 7933`) and expose only that
+   port through an HTTPS tunnel (any tunnel tool). Never point the tunnel at the chat UI's port
+   (7932): the chat UI has no login, and its only protection is PydanticAI's check that the
+   `Host` header is localhost or an IP. A tunnel that rewrites the `Host` header (for example
+   ngrok's `--host-header=rewrite`) defeats that check, so anyone with the URL could chat with
+   Mel and spend your OpenRouter credits. The webhook app has no chat UI.
 3. Set "When a message comes in" to `https://<tunnel>/whatsapp/twilio`, method POST.
 4. In `.env`, set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` (the Sandbox
    number, as `whatsapp:+14155238886`) and `TWILIO_WEBHOOK_URL`, exactly the URL from step 3.
@@ -99,6 +106,15 @@ real model, so it needs `OPENROUTER_API_KEY` and spends credits.
 Twilio says the Sandbox number "might be temporarily restricted from sending to certain
 countries, such as Brazil", so replies to +55 numbers may fail; test with your number first.
 The planned fallback is a Meta WhatsApp Cloud API adapter on the same core (`whatsapp.Channel`).
+
+Known limitations:
+
+- Replay: a Twilio signature has no timestamp, and the dedupe remembers only the last 1,000
+  `MessageSid`s in memory. Someone who captured a signed request can replay it once its id has
+  left that window (or after a restart); Mel then answers it again, to the original sender.
+- Recycled numbers: history is kept per phone number for up to 24 h after the last message, so
+  if a number changes hands within that window, the new holder's messages continue the previous
+  holder's conversation, including any order details looked up in it.
 
 Out of scope for now: the Meta adapter, message templates and re-engaging a customer after the
 24-hour window, media handling, persisting history, and using the sender's phone number as the
@@ -132,7 +148,8 @@ there the same core serves several messaging providers. Dependencies point inwar
 | `agent.py` | The PydanticAI `Agent`, the four thin tool wrappers, `Deps` (the clock only) and the `Hooks` capability. The only module that imports PydanticAI. |
 | `prompt.py` | Mel's instructions, in sections F1 to F4 that map to the challenge's criteria. |
 | `config.py` | Stdlib only: loads `.env` (real env vars win) and turns `EMPORIO_NOW` into the clock. |
-| `cli.py`, `web.py` | Thin entry points: a REPL over `agent.run_sync`, and `agent.to_web()` mounted in Starlette, plus the WhatsApp route when Twilio is configured. |
+| `cli.py`, `web.py` | Thin entry points: a REPL over `agent.run_sync`, and `agent.to_web()` mounted in Starlette. |
+| `whatsapp_app.py` | The webhook-only Starlette app: `POST /whatsapp/twilio` when Twilio is configured, nothing else. The one app meant to be exposed through a tunnel. |
 | `whatsapp.py` | The WhatsApp channel core: the `Channel` port, in-memory history per sender, dedupe, per-sender locks, reply formatting and one agent turn per message. No PydanticAI import. |
 | `whatsapp_twilio.py` | The Twilio adapter for `Channel`: signature check against `TWILIO_WEBHOOK_URL`, form parsing, and sending through the Messages API. Stdlib and Starlette only. |
 
@@ -144,8 +161,10 @@ flowchart LR
     cli --> agent
     web --> config
     web --> agent
-    web --> whatsapp
-    web --> whatsapp_twilio
+    whatsapp_app --> config
+    whatsapp_app --> agent
+    whatsapp_app --> whatsapp
+    whatsapp_app --> whatsapp_twilio
     whatsapp --> agent
     whatsapp --> cli
     whatsapp --> services
@@ -383,7 +402,8 @@ traffic before it gates anything.
 - Conversation history lives in memory only (the CLI process, or the browser tab in the web
   UI); closing it loses the conversation.
 - WhatsApp history, the `MessageSid` dedupe and the per-sender locks live in one server
-  process's memory, so they are lost on restart and not shared between processes.
+  process's memory, so they are lost on restart and not shared between processes. Replay and
+  recycled-number limits are listed in "WhatsApp channel".
 - The web UI front end loads from a CDN and is meant for local development, not production.
 - Shipping outside Campo Grande is never quoted (no CEP lookup); Mel says it needs a quote by
   CEP and never invents a value.
