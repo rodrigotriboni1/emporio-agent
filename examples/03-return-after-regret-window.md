@@ -31,13 +31,15 @@ Usage: 1 requests, 1624 input tokens, 102 output tokens
 
 **Mel**
 
-> Letícia, achei seu pedido aqui. O pedido 7 foi entregue e o valor foi de R$ 159,90.
+> Obrigada, Letícia! Localizei seu pedido 7 aqui. 🙂
 >
-> Sobre o arrependimento: o prazo pra devolução por arrependimento era até 24/02/2026, e ele já está encerrado. O prazo de troca por preferência também encerrou na mesma data, e o de defeito foi até 05/03/2026. A garantia legal segue aberta até 18/05/2026.
+> Sobre o arrependimento: o prazo pra devolução por arrependimento era até **24/02/2026**, e ele já está encerrado. A troca por preferência também tinha o mesmo prazo (até 24/02/2026), igualmente encerrado.
 >
-> Como o prazo de arrependimento já passou, o ideal é eu encaminhar seu caso pro time, que pode avaliar com você. Quer que eu faça isso?
+> O que ainda está aberto é a **garantia legal, até 18/05/2026** — nesse caso, para questões de defeito no produto.
+>
+> Como o prazo de arrependimento já passou, o ideal é eu encaminhar seu caso pro nosso time, que pode avaliar com você. Quer que eu faça esse encaminhamento?
 
-Usage: 2 requests, 3712 input tokens, 360 output tokens
+Usage: 2 requests, 3712 input tokens, 463 output tokens
 
 ## Turn 3
 
@@ -45,12 +47,14 @@ Usage: 2 requests, 3712 input tokens, 360 output tokens
 
 > Sim, pode encaminhar para a equipe, por favor.
 
-- Tool call: `handoff_to_human(reason='Cliente quer devolver pedido por arrependimento, mas o prazo já está encerrado.', summary='Pedido 7 (Letícia), entregue, valor R$ 159,90. Prazo de arrependimento encerrado em 24/02/2026; troca por preferência encerrada; defeito encerrado em 05/03/2026; garantia legal aberta até 18/05/2026. Cliente pediu devolução por arrependimento e concordou com o encaminhamento.')`
+- Tool call: `handoff_to_human(reason='Cliente quer devolver pedido por arrependimento, mas o prazo já está encerrado.', summary='Pedido 7 (Letícia, tel ***0123, entregue, valor R$ 159,90. Prazo de arrependimento e troca por preferência encerrados em 24/02/2026; garantia legal aberta até 18/05/2026. Cliente pediu devolução por arrependimento e autorizou o encaminhamento ao time.')`
 
 **Mel**
 
-> Prontinho, Letícia! Encaminhei seu atendimento para a equipe. O protocolo é **EM-20260325-0001**.
+> Prontinho, Letícia! Encaminhei seu caso para o nosso time. ✅
 >
-> O time dá um retorno em até 24 horas úteis. Qualquer outra coisa que eu possa ajudar, é só chamar. 🎶
+> Seu protocolo de atendimento é **EM-20260325-0001**. A equipe retorna em até 24 horas úteis.
+>
+> Qualquer outra coisa que eu possa ajudar, é só chamar!
 
-Usage: 2 requests, 4744 input tokens, 251 output tokens
+Usage: 2 requests, 4942 input tokens, 244 output tokens
