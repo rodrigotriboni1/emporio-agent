@@ -50,7 +50,7 @@ edited by hand.
 Model spike: `uv run python scripts/spike.py` compares the candidate models live and writes
 `docs/spike-results.md` (also generated, also spends credits).
 
-The full gate, the same one CI runs, is `factory/checks.sh`:
+The full validation, the same commands CI runs:
 
 ```bash
 uv sync --frozen
@@ -285,7 +285,7 @@ is visible only in the data.
 | Installments: the summary table in section 3 disagrees with the tiers in section 3.1. | Section 3.1 wins: up to 3x with no minimum, 4x–6x need installments of at least R$ 80,00, 7x–12x at least R$ 100,00. |
 | "Exceto abaixo de R$ 50,00" is ambiguous. | Purchases below R$ 50 are not split into installments. |
 | The manual says "mais de 300 instrumentos"; the catalog has 65 products. | Mel never quotes a catalog size. |
-| The wind (Sopro) and orchestral strings (Cordas Orquestrais) categories have no products. | Mel says nothing is available in the system right now, not "we don't sell it". |
+| The woodwind (Instrumentos de Sopro (Madeiras)) and orchestral strings (Cordas Orquestrais) categories have no products. | Mel says nothing is available in the system right now, not "we don't sell it". |
 | The manual says to suggest partner stores, but no partner list exists. | No partner store is ever named. |
 | Product 136 is `discontinued` but has stock 13. | Status beats stock: "no longer in the catalog", plus alternatives. |
 | Product 130 is `coming_soon` but was sold in orders 3 and 14. | Status wins for new sales ("coming soon", not sold, stock not quoted); past orders are reported as recorded. |
@@ -353,21 +353,20 @@ The project was built with Claude Code as the assistant, in these stages:
   session with the assistant over the challenge brief, the store manual and the CSVs.
 - **Grilling:** the spec then went through two grilling rounds, where the assistant questioned
   each decision until it was justified or cut (recorded in the spec's status line).
-- **Opus review agents:** each pull request is reviewed by reviewer agents before approval;
-  the security reviewer runs on Opus (`factory/config.json`).
+- **Opus review agents:** each pull request is reviewed by reviewer agents before approval.
   `TODO(author): describe any other Opus review passes (spec, prompt) and what they changed.`
 - **Research agent:** the framework choice comes from a research agent's report,
   `docs/research/2026-11-02-python-agent-framework.md`, which ranks the candidates with
   sources and lists the gotchas the spike had to confirm.
-- **Software factory:** implementation ran through `factory/`. Each GitHub issue labeled
-  `factory` goes through intake → spec → build → gate → review → approve in its own git
-  worktree, and becomes one pull request (one issue → one PR). `factory/checks.sh` is the gate:
-  a branch reaches review only when it passes, and CI runs the same script.
+- **Software factory:** the code was built with a local software factory of Claude Code agents
+  (intake, spec, build, gate, reviews, approver), one pull request per GitHub issue. Its
+  tooling is not included in this repository. The gate runs the validation commands from "Run
+  steps", and a branch reaches review only when they pass.
 
 What was verified, and how:
 
-- `factory/checks.sh` (ruff, format check and the full offline test suite) is the gate every
-  factory branch passed before review; CI runs it on every push and pull request.
+- The validation commands (ruff, format check and the full offline test suite) passed on every
+  factory branch before review; CI runs them on every push and pull request.
 - The transcripts in `examples/` come from live runs of `scripts/scenarios.py` that passed their
   automated checks, and `docs/spike-results.md` from a live run of `scripts/spike.py`.
 - Still pending, not yet verified: the web UI chatting through OpenRouter on the default model,
@@ -382,5 +381,3 @@ What was verified, and how:
   copied.
 - The store data (`data/`: the CSVs and the policy manual) is fictional and was provided by the
   challenge.
-- The `factory/` and `.claude/` files (the software factory and its agents) are GPLv3, by
-  zazencodes.
