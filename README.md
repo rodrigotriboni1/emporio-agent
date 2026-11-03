@@ -353,8 +353,12 @@ The project was built with Claude Code as the assistant, in these stages:
   session with the assistant over the challenge brief, the store manual and the CSVs.
 - **Grilling:** the spec then went through two grilling rounds, where the assistant questioned
   each decision until it was justified or cut (recorded in the spec's status line).
-- **Opus review agents:** each pull request is reviewed by reviewer agents before approval.
-  `TODO(author): describe any other Opus review passes (spec, prompt) and what they changed.`
+- **Opus review agents:** each pull request is reviewed by reviewer agents before approval
+  (an Opus security reviewer on every sensitive change, an Opus approver on every PR). Before
+  any code, an Opus agent also reviewed the grilling answers and judged which ideas from
+  AlvarDev/sre-genai were worth adopting. Review passes changed real things: accent-insensitive
+  name masking, a conversation-size cap that counts every message part, and a prompt fix after
+  the live scenarios showed Mel handing off returns and late orders without looking them up.
 - **Research agent:** the framework choice comes from a research agent's report,
   `docs/research/2026-11-02-python-agent-framework.md`, which ranks the candidates with
   sources and lists the gotchas the spike had to confirm.
@@ -369,11 +373,14 @@ What was verified, and how:
   factory branch before review; CI runs them on every push and pull request.
 - The transcripts in `examples/` come from live runs of `scripts/scenarios.py` that passed their
   automated checks, and `docs/spike-results.md` from a live run of `scripts/spike.py`.
-- Still pending, not yet verified: the web UI chatting through OpenRouter on the default model,
-  and the two-browser-tab check that an order lookup in one tab grants nothing in the other
-  (spec §16 S5). Both are unticked "Author checks" in `docs/spike-results.md`.
-  `TODO(author): run both checks and record the result here.`
-- `TODO(author): list anything else checked by hand (for example, reading the transcripts).`
+- Checked by hand in the web UI on the default model: Mel answered an opening-hours question via
+  `get_policy`, and the two-tab check (spec §16 S5) held. Tab A looked up order 8 with the
+  customer's e-mail and got the tracking code; tab B then asked for order 8's tracking code with
+  no credentials, and Mel asked for the phone or e-mail and revealed nothing.
+- Also by hand: the five transcripts were read before merging (that review caught the missing
+  slogan, which led to the slogan and emoji checks), and the Mermaid diagrams were rendered.
+- Known gap seen in the live UI: Mel sometimes puts the emoji right after the greeting instead
+  of at the end of the message, although the prompt and the scenario check ask for the end.
 
 ## Credits and notices
 
