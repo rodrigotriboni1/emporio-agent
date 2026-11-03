@@ -28,7 +28,7 @@ LOG_ARG_CHARS = 256
 
 INPUT_TOO_LONG = "Sua mensagem ficou muito longa. Pode enviar uma versão mais curta, por favor?"
 HISTORY_TOO_LONG = (
-    "Nossa conversa ficou muito longa. Por favor, comece uma nova conversa para continuar."
+    "Nossa conversa ficou muito longa. Pode começar uma nova conversa para continuar, por favor?"
 )
 TURN_LIMIT_REACHED = (
     "Não consegui concluir seu atendimento agora. Fale com a nossa equipe pelo WhatsApp "
@@ -43,33 +43,31 @@ class Deps:
     now: Callable[[], datetime]
 
 
-def _prompt_text(part: UserPromptPart) -> str:
-    content = part.content
-    if isinstance(content, str):
-        return content
-    return "".join(c for c in content if isinstance(c, str))
-
-
 def _last_user_text(messages: list) -> str:
     for message in reversed(messages):
         if isinstance(message, ModelRequest):
             for part in reversed(message.parts):
                 if isinstance(part, UserPromptPart):
-                    return _prompt_text(part)
+                    content = part.content
+                    if isinstance(content, str):
+                        return content
+                    return "".join(c for c in content if isinstance(c, str))
     return ""
 
 
 def _part_chars(part) -> int:
-    # The browser sends the whole history each turn, so tool calls and returns count too.
-    if isinstance(part, UserPromptPart):
-        return len(_prompt_text(part))
-    if isinstance(part, TextPart):
-        return len(part.content)
+    # The browser sends the whole history each turn and any part reaches the model, so all count.
     if isinstance(part, BaseToolCallPart):
         return len(part.args_as_json_str())
     if isinstance(part, BaseToolReturnPart):
         return len(part.model_response_str())
-    return 0
+    content = getattr(part, "content", "")
+    if isinstance(content, str):
+        return len(content)
+    if isinstance(part, UserPromptPart):
+        # Mel takes no files, so any non-text item puts the conversation over the cap.
+        return sum(len(c) if isinstance(c, str) else MAX_HISTORY_CHARS + 1 for c in content)
+    return len(str(content))
 
 
 def _history_chars(messages: list) -> int:

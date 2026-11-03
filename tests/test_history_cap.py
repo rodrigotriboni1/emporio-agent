@@ -1,10 +1,15 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from pydantic_ai import models
 from pydantic_ai.messages import (
+    BinaryContent,
+    FilePart,
     ModelRequest,
     ModelResponse,
+    RetryPromptPart,
     TextPart,
+    ThinkingPart,
     ToolCallPart,
     ToolReturnPart,
     UserPromptPart,
@@ -51,6 +56,33 @@ def test_large_tool_return_counts_toward_the_cap():
         ModelRequest(parts=[ToolReturnPart("search_products", "x" * 40_001, "c1")]),
         ModelResponse(parts=[TextPart("Temos estes.")]),
     ]
+    assert run(history) == (HISTORY_TOO_LONG, 0)
+
+
+@pytest.mark.parametrize(
+    "part",
+    [
+        ThinkingPart("x" * 40_001),
+        FilePart(BinaryContent(b"x" * 40_001, media_type="application/octet-stream")),
+    ],
+)
+def test_any_response_part_counts_toward_the_cap(part):
+    history = [
+        ModelRequest(parts=[UserPromptPart("oi")]),
+        ModelResponse(parts=[part, TextPart("b")]),
+    ]
+    assert run(history) == (HISTORY_TOO_LONG, 0)
+
+
+@pytest.mark.parametrize(
+    "part",
+    [
+        RetryPromptPart("x" * 40_001),
+        UserPromptPart(["olha", BinaryContent(b"tiny", media_type="image/png")]),
+    ],
+)
+def test_any_request_part_counts_toward_the_cap(part):
+    history = [ModelRequest(parts=[part]), ModelResponse(parts=[TextPart("b")])]
     assert run(history) == (HISTORY_TOO_LONG, 0)
 
 
