@@ -7,8 +7,8 @@
 - One PydanticAI agent, four deterministic tools (product search, policy section, order lookup,
   handoff). The tools compute every price, stock figure, deadline and order fact; the prompt forbids
   stating one without a tool result, and the scenario checks trace every `R$` amount to a tool.
-- "The simplest way possible" was read as that minimal core, with optional extras such as the
-  WhatsApp channel off by default. "All responses in English" was read as code, docs and this
+- "The simplest way possible" was read as that minimal core and nothing more: a WhatsApp channel
+  was built and then moved to its own branch (see Scaling). "All responses in English" was read as code, docs and this
   README in English, while Mel answers customers in their language (PT-BR by default).
 
 ## Approach
@@ -33,8 +33,9 @@ The order in which the problem was worked, each step linked to where it is detai
 6. **Review against the brief, then fix.** Two independent evaluations against the challenge
    criteria found real gaps (a masked protocol number, unrequested handoffs, a wrong opening-hours
    sentence, a hard-to-read README), each fixed before delivery.
-7. **Keep extras optional.** The core is one agent and four tools; the WhatsApp channel is off by
-   default ([Optional extra](#optional-extra-whatsapp-channel)).
+7. **Cut what the brief did not ask for.** A WhatsApp channel was built, reviewed and then moved to
+   the `feature/whatsapp-channel` branch; partner-store referral and multiple stores are designed
+   but not built ([Scaling](#scaling)).
 
 ## Quickstart
 
@@ -88,7 +89,6 @@ write-up: `docs/superpowers/specs/2026-11-02-emporio-agent-design.md`.
 | `agent.py` | The PydanticAI `Agent`, the four thin tool wrappers, `Deps` (the clock only) and the `Hooks` capability. The only module that imports PydanticAI. |
 | `prompt.py` | Mel's instructions, in four numbered sections that map to the brief's four behaviours. |
 | `config.py`, `cli.py`, `web.py` | Stdlib `.env` loading and the `EMPORIO_NOW` clock; thin entry points: a REPL over `agent.run_sync`, and `agent.to_web()` in Starlette. |
-| `whatsapp_app.py`, `whatsapp.py`, `whatsapp_twilio.py` | The optional WhatsApp channel: webhook app, channel core (the `Channel` port) and Twilio adapter. |
 
 ```mermaid
 flowchart LR
@@ -96,14 +96,6 @@ flowchart LR
     cli --> agent
     web --> config
     web --> agent
-    whatsapp_app --> config
-    whatsapp_app --> agent
-    whatsapp_app --> whatsapp
-    whatsapp_app --> whatsapp_twilio
-    whatsapp --> agent
-    whatsapp --> cli
-    whatsapp --> services
-    whatsapp_twilio --> whatsapp
     agent --> config
     agent --> prompt
     agent --> services
@@ -211,15 +203,14 @@ erDiagram
   promotional price when a promotion is active (PIX does not stack on it). So in
   `examples/01-catalog-search.md` the R$ 1.049,00 guitar (R$ 996,55 via PIX) is "até R$ 1000".
 - **A pure core, no ports or DTOs**: plain functions over frozen dataclasses in `domain.py`, tested
-  without mocks; the one port, `whatsapp.Channel`, has a second adapter (Meta) planned.
+  without mocks. A port earns its place only with a second adapter, and there is none here.
 - **Stateless order verification**: credentials checked per call, `deps` holds only the clock, as
   `to_web()` shares one `deps` across conversations. **Regex masking**: handoff text is free-form.
 - **Limits in `Hooks`, not `UsageLimits`** (`to_web()` takes none): messages over 2,000 characters
   are rejected, a turn stops after 10 model requests, a conversation stops at 40,000 characters.
 - **Non-goals:** multi-agent; text-to-SQL (could read any customer's rows); storing conversations
-  on disk (PII; history stays in memory: CLI, browser tab, or WhatsApp per-sender); a hand-written
-  chat API (the only custom endpoint is the optional WhatsApp webhook); a custom UI (the built-in
-  one is enough); Docker; write operations.
+  on disk (PII; history stays in memory: CLI process or browser tab); a hand-written chat API
+  (`to_web()` serves one); a custom UI (the built-in one is enough); Docker; write operations.
 
 ## Spike results
 
@@ -271,7 +262,7 @@ like "violao?", and either fail closed (blocking customers) or open (protecting 
 - Web UI: provider errors reach the browser as `str(error)`; the front end loads from a CDN (local
   use only). Holidays are not modelled in "open now".
 - The 5-failure order lock and all history are in memory only (process or browser tab): lost on
-  restart, not shared. WhatsApp limits are in "Optional extra: WhatsApp channel".
+  restart, not shared.
 - Shipping outside Campo Grande is never quoted (no CEP lookup); the manual's return exclusions
   have no data flag, so Mel states them as conditions.
 
@@ -283,8 +274,9 @@ like "violao?", and either fail closed (blocking customers) or open (protecting 
 | Knowledge (one manual → many documents) | `get_policy` serves 9 fixed topics | RAG enters here: chunks by section with metadata, hybrid retrieval and reranking | "Only answer from a source" |
 | Traffic | Failure lock and handoffs in process memory and a file | Stateless verification scales horizontally; the lock moves to Redis; handoffs go to a queue | Tools, prompt, rules |
 | Domains (4 → 30 tools) | One agent starts picking the wrong tool | A cheap router in front of specialists, when the spike harness shows tool accuracy dropping | Specialists reuse `services` |
-| Channels | CLI, web UI and WhatsApp, history in process memory | More adapters on `whatsapp.Channel` (Meta next); history in an encrypted store; tools as an MCP server | The agent itself |
-| Multiple stores | One store's data and persona | A tenant id in `deps`, data, persona and manual per store | The rule code |
+| Channels | CLI and web UI, history in process memory | A provider-agnostic webhook core with one adapter per provider (built for Twilio on the `feature/whatsapp-channel` branch, design in `docs/research/2026-11-03-whatsapp-integration.md`); history in an encrypted store | The agent itself |
+| Multiple stores | One store's data, persona and rule parameters | A store id taken from the request (channel number or URL), never from the model; data, manual, persona and parameters (PIX %, installment tiers, shipping, hours) per store; each store has its own conversations | The rule code |
+| Partner stores | The manual asks to suggest partners, but no partner list exists | Partners become data (`partners.csv`) served by a tool; Mel names only partners a tool returned; referring a customer opens a new conversation at that store, carrying no history or personal data without consent | Grounding: nothing named without a source |
 | Quality and cost | Spike and scenarios run by hand | Scheduled regression runs with pass rates; OpenTelemetry traces; model routing | The harness |
 
 ## Next steps
@@ -338,7 +330,7 @@ calls; the assistant did the research, the code and the reviews, through these s
 5. **Evaluate.** Two independent evaluator agents graded the repo against the brief's criteria;
    their findings became issues and went through the same pipeline.
 
-Result: 15 issues and 28 merged pull requests, all merge commits. The reviews caught real defects:
+Result: 15 issues and 29 merged pull requests, all merge commits. The reviews caught real defects:
 a conversation-size cap that reasoning parts could bypass, accent-sensitive name masking,
 README claims the code did not back, unrequested handoffs and a wrong opening-hours sentence.
 Live runs also failed honestly: when the model kept misplacing an emoji, the build stopped as
@@ -351,22 +343,3 @@ web UI held: tab B asked for order 8's tracking code with no credentials and Mel
 
 - Some ideas came from [AlvarDev/sre-genai](https://github.com/AlvarDev/sre-genai); no code copied.
 - The store data in `data/` is fictional and was provided by the challenge.
-
-## Optional extra: WhatsApp channel
-
-A Twilio webhook app, `emporio.whatsapp_app`, separate from the chat UI: it serves only
-`POST /whatsapp/twilio`, and only when the four `TWILIO_*` variables are set. Detail:
-`docs/research/2026-11-03-whatsapp-integration.md`. Without a WhatsApp account,
-`uv run python scripts/whatsapp_dryrun.py "Oi, vocês têm violão?"` runs one message through the
-same core (real model, spends credits).
-
-1. In the Twilio Console, join the WhatsApp Sandbox (`join <code>` from your phone).
-2. Run `uv run uvicorn emporio.whatsapp_app:app --host 127.0.0.1 --port 7933` and tunnel only
-   port 7933. **Never tunnel port 7932:** the chat UI has no login, only a `Host` header check
-   that a tunnel rewriting `Host` defeats, so anyone could spend your credits.
-3. Point "When a message comes in" at `https://<tunnel>/whatsapp/twilio` (POST); in `.env` set that
-   URL as `TWILIO_WEBHOOK_URL`, plus the other three `TWILIO_*` variables, and restart.
-
-Known limitations: replay (signatures carry no timestamp; the dedupe keeps only the last 1,000
-`MessageSid`s), recycled numbers (history is kept per number for 24 h, so a new holder continues
-the old conversation), the Sandbox may not send to Brazil (+55), and history is in memory only.
