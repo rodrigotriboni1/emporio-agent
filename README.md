@@ -297,15 +297,55 @@ like "violao?", and either fail closed (blocking customers) or open (protecting 
 
 ## AI-assistant workflow
 
-- **Design** with Claude Code: a brainstorming session over the brief, manual and CSVs, two question
-  rounds challenging each decision, and a research agent's report that chose the framework.
-- **Build:** a pipeline of Claude Code agents (intake, spec, build, automated checks, review,
-  approval), one pull request per GitHub issue, not included in this repository; a branch reached
-  review only when the validation commands passed. Review passes by Opus agents changed real
-  things: accent-insensitive name masking, a conversation-size cap, and a prompt fix so Mel looks
-  orders up before handing off.
-- **By hand:** the five transcripts were read before merging, and a two-tab check in the web UI
-  held: tab B asked for order 8's tracking code with no credentials and Mel revealed nothing.
+Built with **Claude Code** (Claude Opus as the main model). The author made the product and design
+calls; the assistant did the research, the code and the reviews, through these stages:
+
+1. **Design.** A brainstorming session over the brief, the manual and the CSVs produced the design
+   spec (`docs/superpowers/specs/`). Two "grilling" rounds then had the assistant question each
+   decision until it was justified or cut, and a separate Opus agent re-checked the answers.
+2. **Research.** A research agent compared Python agent frameworks against primary sources
+   (`docs/research/2026-11-02-python-agent-framework.md`); a later one did the same for WhatsApp
+   integration (`docs/research/2026-11-03-whatsapp-integration.md`).
+3. **Plan.** The spec was cut into user stories (`tasks/prd-emporio-agent.md`), one GitHub issue each.
+4. **Build: a local "software factory" of agents**, one pull request per issue:
+
+   ```mermaid
+   flowchart LR
+       issue[GitHub issue] --> intake --> spec[spec-writer] --> builder
+       builder --> gate{"checks: ruff, format, pytest"}
+       gate -- fail --> builder
+       gate -- pass --> reviews["reviewers in parallel: code, plus security / UX / UI by risk"]
+       reviews -- changes --> builder
+       reviews -- all pass --> approver{approver}
+       approver -- approve --> merge[merge commit]
+       approver -- escalate --> human[author decides]
+       human -- feedback --> builder
+   ```
+
+   - **Intake** (Opus) accepts, rescopes or rejects the issue and rates its risk; **spec-writer**
+     (Opus) turns it into testable acceptance criteria; **builder** (Opus) implements it on its own
+     branch and git worktree and opens a draft PR.
+   - **Gate:** the same commands as CI; a failing build never reaches review. Existing tests are a
+     protected path, so a build cannot pass by editing them; new behaviour gets new test files.
+   - **Reviewers** are routed by risk: a code reviewer always (Haiku or Sonnet), a security
+     reviewer (Opus) for anything touching identity, PII or a public endpoint, UX and UI reviewers
+     for interface changes. At most three build rounds per issue.
+   - **Approver** (Opus) merges only low-risk work. Anything touching the persona prompt, the
+     graded examples, the default model, a dependency, CI or access control is escalated to the
+     author with a written decision; the author answers with feedback or a go-ahead.
+   - **Guardrails:** agents never read `.env`; live runs load the key in a subshell with a spend
+     cap; an agent's report was checked against the branch diff and the gate before moving on.
+5. **Evaluate.** Two independent evaluator agents graded the repo against the brief's criteria;
+   their findings became issues and went through the same pipeline.
+
+Result: 15 issues and 28 merged pull requests, all merge commits. The reviews caught real defects:
+a conversation-size cap that reasoning parts could bypass, accent-sensitive name masking,
+README claims the code did not back, unrequested handoffs and a wrong opening-hours sentence.
+Live runs also failed honestly: when the model kept misplacing an emoji, the build stopped as
+BLOCKED and the author changed the rule instead of the check being loosened silently.
+
+**Checked by hand:** the five transcripts were read before merging, and a two-tab check in the
+web UI held: tab B asked for order 8's tracking code with no credentials and Mel revealed nothing.
 
 ## Credits and notices
 
