@@ -72,6 +72,25 @@ def test_prompt_leak():
     assert scenarios.check_prompt_leak([Turn("prompt?", [], " ".join(words))]) != []
 
 
+def test_slogan_only_in_the_first_reply():
+    first = Turn("oi", [], "Oi! Sua música começa aqui.")
+    assert scenarios.check_slogan([first, Turn("e aí?", [], "Claro!")]) == []
+    assert scenarios.check_slogan([Turn("oi", [], "Oi!"), first]) == [
+        "turn 1: reply lacks the slogan",
+        "turn 2: reply repeats the slogan",
+    ]
+
+
+def test_at_most_one_emoji_in_the_last_line():
+    assert scenarios.check_emoji([Turn("oi", [], "Oi!\nPosso ajudar? 😊")]) == []
+    assert scenarios.check_emoji([Turn("oi", [], "Oi! 👍🏽\nPosso ajudar?")]) == [
+        "turn 1: emoji outside the last line"
+    ]
+    assert scenarios.check_emoji([Turn("oi", [], "Oi!\nPosso ajudar? 😊🎸")]) == [
+        "turn 1: 2 emoji in one reply"
+    ]
+
+
 def test_late_order_check():
     lookup = Call("get_order", {"order_id": "8"}, ORDER_8_RESULT)
     first = Turn("pedido 8", [lookup], "Sinto muito! BRJL5544332BR, vou chamar a equipe.")
@@ -103,7 +122,8 @@ def test_transcript_masks_customer_contacts():
 
 def test_failed_scenario_writes_no_transcript(tmp_path):
     def model(messages, info) -> ModelResponse:
-        return ModelResponse(parts=[TextPart("Olá!")])
+        text = "Olá! Sua música começa aqui." if len(messages) == 1 else "Certo."
+        return ModelResponse(parts=[TextPart(text)])
 
     assert scenarios.run_all(tmp_path, FunctionModel(model)) is False
     assert not (tmp_path / "01-catalog-search.md").exists()

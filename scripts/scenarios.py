@@ -40,6 +40,10 @@ PARTNER_STORES = [
 REPLY_AMOUNT = re.compile(r"R\$\s?[\d.]+,\d{2}")
 SOURCE_AMOUNT = re.compile(r"R\$\s?(\d+(?:\.\d{3})*)(?:,(\d{2}))?")
 LEAK_WORDS = 8
+SLOGAN = "sua música começa aqui"
+# shortcut: common pictograph blocks only, and a flag counts as two; widen if Mel uses others.
+_PICTO = "[\U0001f000-\U0001faff⌀-⏿☀-➿⬀-⯿]"
+EMOJI = re.compile(rf"{_PICTO}[️\U0001f3fb-\U0001f3ff]*(?:‍{_PICTO}[️]*)*")
 
 
 @dataclass
@@ -172,7 +176,36 @@ def check_prompt_leak(turns: list[Turn]) -> list[str]:
     ]
 
 
-COMMON_CHECKS = [check_grounding, check_order_facts, check_forbidden, check_prompt_leak]
+def check_slogan(turns: list[Turn]) -> list[str]:
+    failures = []
+    for n, turn in enumerate(turns, 1):
+        if n == 1 and SLOGAN not in turn.reply.casefold():
+            failures.append("turn 1: reply lacks the slogan")
+        if n > 1 and SLOGAN in turn.reply.casefold():
+            failures.append(f"turn {n}: reply repeats the slogan")
+    return failures
+
+
+def check_emoji(turns: list[Turn]) -> list[str]:
+    failures = []
+    for n, turn in enumerate(turns, 1):
+        found = EMOJI.findall(turn.reply)
+        last = (turn.reply.strip().splitlines() or [""])[-1]
+        if len(found) > 1:
+            failures.append(f"turn {n}: {len(found)} emoji in one reply")
+        elif found and not EMOJI.search(last):
+            failures.append(f"turn {n}: emoji outside the last line")
+    return failures
+
+
+COMMON_CHECKS = [
+    check_grounding,
+    check_order_facts,
+    check_forbidden,
+    check_prompt_leak,
+    check_slogan,
+    check_emoji,
+]
 
 
 def _tools(turns: list[Turn]) -> list[str]:
