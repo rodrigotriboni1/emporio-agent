@@ -46,6 +46,11 @@ Unit tests never call an LLM. Never commit `.env` or any API key.
 - `src/emporio/services.py` holds the use cases behind Mel's tools: it returns
   PT-BR text, enforces order authorization and PII masking, and imports only
   `domain`, `store` and `search`.
+- `src/emporio/agent.py` is the only module that imports PydanticAI. Its four tools are
+  thin wrappers over `services`; `deps` holds only the clock; one `Hooks` capability holds
+  the input and request limits and the stderr logging.
+- `src/emporio/prompt.py` holds Mel's instructions, written in English and telling Mel to
+  reply in PT-BR, in sections F1 to F4. It does not import PydanticAI.
 - Conventional Commits. Never push to `main`; work on a branch and open a PR.
   PRs merge with a merge commit, never squash.
 
