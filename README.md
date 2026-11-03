@@ -20,6 +20,17 @@ uv run uvicorn emporio.web:app --host 127.0.0.1 --port 7932       # or in the br
 the store clock (default `2026-03-25T10:00-04:00`, three days after the last order; `now` for the
 real clock).
 
+**Or let an AI coding assistant set it up.** Paste this into Claude Code (or a similar tool):
+
+```text
+Clone https://github.com/rodrigotriboni1/emporio-agent and set it up following its README:
+install uv if it is missing, run `uv sync`, copy `.env.example` to `.env`, and run `uv run pytest`.
+Then stop and ask me to paste my OpenRouter API key into `.env` myself; never ask for the key in
+chat, print it or commit it. Once I confirm, start the web chat with
+`uv run uvicorn emporio.web:app --host 127.0.0.1 --port 7932` and tell me to open
+http://127.0.0.1:7932.
+```
+
 Tests: `uv run pytest` (no LLM calls, runs in CI). `uv run python scripts/scenarios.py` replays five
 scripted conversations on the real model and checks them; `uv run python scripts/spike.py` compares
 models. Both spend a few cents of OpenRouter credit.
