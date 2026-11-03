@@ -85,6 +85,7 @@ src/emporio/
 ├── domain.py    # frozen dataclasses, enums, value objects, pure rules. No I/O.
 ├── store.py     # loads data/*.csv and data/politicas.md into domain objects;
 │                #   queries; load-time invariants
+├── search.py    # deterministic product search and same-category alternatives
 ├── services.py  # use cases: search, policy, order lookup, handoff.
 │                #   Authorization is enforced here.
 ├── agent.py     # PydanticAI Agent, tool wrappers, Deps (clock only)

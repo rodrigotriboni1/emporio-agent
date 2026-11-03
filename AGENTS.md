@@ -41,6 +41,8 @@ Unit tests never call an LLM. Never commit `.env` or any API key.
   `emporio` modules, and time is always passed in as `now`.
 - `src/emporio/store.py` loads `data/` into domain objects and checks the
   load-time invariants; it imports only `domain`.
+- `src/emporio/search.py` is the deterministic product search over the `Store`;
+  it imports only `domain` and `store`.
 - Conventional Commits. Never push to `main`; work on a branch and open a PR.
   PRs merge with a merge commit, never squash.
 
