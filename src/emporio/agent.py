@@ -114,10 +114,10 @@ def _log_usage(ctx: RunContext[Deps], *, result):
 
 config.load_dotenv()
 agent = Agent(
-    os.environ.get("MODEL", "openrouter:google/gemini-3.8-flash"),
+    os.environ.get("MODEL", "openrouter:deepseek/deepseek-v4.1-flash"),
     deps_type=Deps,
     defer_model_check=True,
-    model_settings={"max_tokens": 2048},  # placeholder; US-007 tunes it
+    model_settings={"max_tokens": 1024},  # from docs/spike-results.md
     capabilities=[hooks],
 )
 
