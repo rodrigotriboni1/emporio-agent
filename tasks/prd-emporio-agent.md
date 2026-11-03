@@ -1,5 +1,7 @@
 # PRD: Mel, the Empório da Música customer-service agent
 
+> Planning document written before implementation. Where it differs from the code, the README is authoritative.
+
 > Note: the software factory tooling and `factory/checks.sh` are not in this repository; the equivalent validation commands are in README's Quickstart.
 
 - Source of truth for behaviour: `docs/superpowers/specs/2026-11-02-emporio-agent-design.md`
