@@ -65,6 +65,8 @@ _WEEKDAYS = (
 )
 _EMAIL = re.compile(r"[\w.+-]+[ \t]*@[ \t]*[\w-]+(?:\.[\w-]+)+")
 _DIGIT_RUN = re.compile(r"[+(]*\d[\d\s().+-]*\d\)?")
+# Handoff protocols; "20" keeps phones out, as no Brazilian DDD is 20.
+_PROTOCOL = re.compile(r"(\bEM-20\d{6}-\d{4}\b)")
 
 
 def _date(value: date) -> str:
@@ -195,9 +197,17 @@ def get_order(store: Store, order_id: str, phone_or_email: str, now: datetime) -
 
 def mask_text(store: Store, text: str) -> str:
     text = _EMAIL.sub(lambda m: mask_pii(re.sub(r"\s", "", m.group())), text)
-    text = _DIGIT_RUN.sub(
-        lambda m: mask_pii(m.group()) if sum(c.isdigit() for c in m.group()) >= 8 else m.group(),
-        text,
+    # Odd pieces of the split are protocols, which are not PII, so digit-run masking skips them.
+    text = "".join(
+        piece
+        if i % 2
+        else _DIGIT_RUN.sub(
+            lambda m: (
+                mask_pii(m.group()) if sum(c.isdigit() for c in m.group()) >= 8 else m.group()
+            ),
+            piece,
+        )
+        for i, piece in enumerate(_PROTOCOL.split(text))
     )
     for name in sorted({c.name for c in store.customers.values()}, key=len, reverse=True):
         text = _mask_name(text, name)
