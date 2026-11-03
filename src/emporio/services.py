@@ -196,17 +196,25 @@ def get_order(store: Store, order_id: str, phone_or_email: str, now: datetime) -
 
 
 def mask_text(store: Store, text: str) -> str:
-    text = _EMAIL.sub(lambda m: mask_pii(re.sub(r"\s", "", m.group())), text)
+    # The store's own e-mail, phones and CEP in the "contact" policy are public, not PII.
+    contact = store.policies.get("contact", "")
+    emails = {re.sub(r"\s", "", e).casefold() for e in _EMAIL.findall(contact)}
+    numbers = {re.sub(r"\D", "", n) for n in _DIGIT_RUN.findall(contact)}
+
+    def email(m: re.Match) -> str:
+        value = re.sub(r"\s", "", m.group())
+        return m.group() if value.casefold() in emails else mask_pii(value)
+
+    def digit_run(m: re.Match) -> str:
+        digits = re.sub(r"\D", "", m.group())
+        # A suffix covers the number without DDD; "55" + number covers the country code.
+        public = any(n.endswith(digits) or digits == f"55{n}" for n in numbers)
+        return m.group() if len(digits) < 8 or public else mask_pii(m.group())
+
+    text = _EMAIL.sub(email, text)
     # Odd pieces of the split are protocols, which are not PII, so digit-run masking skips them.
     text = "".join(
-        piece
-        if i % 2
-        else _DIGIT_RUN.sub(
-            lambda m: (
-                mask_pii(m.group()) if sum(c.isdigit() for c in m.group()) >= 8 else m.group()
-            ),
-            piece,
-        )
+        piece if i % 2 else _DIGIT_RUN.sub(digit_run, piece)
         for i, piece in enumerate(_PROTOCOL.split(text))
     )
     for name in sorted({c.name for c in store.customers.values()}, key=len, reverse=True):
