@@ -1,7 +1,7 @@
 # Empório da Música customer-service agent — design spec
 
 - Date: 2026-11-02
-- Status: approved in brainstorming + two grilling rounds; implementation not started
+- Status: approved in brainstorming + two grilling rounds; implemented in this repository
 - Deadline: Wednesday 2026-11-04 23:59 BRT (hard cut: no push or PR after it)
 - Sources: challenge brief (`desafio_tecnico_ai_eng_artefact.pdf`), store manual
   (`data/politicas_da_loja.pdf`), six CSVs in `data/`, framework research in

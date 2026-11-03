@@ -23,19 +23,19 @@ Two interfaces, run from the repo root (both read `.env` there):
 - CLI: `uv run python -m emporio.cli`
 
 Model spike: `uv run python scripts/spike.py` compares the candidate models live on
-OpenRouter, so it spends credits and never runs in CI. Source the key from the main
-checkout's `.env` first (`set -a; source <main checkout>/.env; set +a`). It writes
-`docs/spike-results.md`, which is generated and never edited by hand.
+OpenRouter, so it spends credits and never runs in CI. Run from the repo root, it reads the
+key from the repo-root `.env`. It writes `docs/spike-results.md`, which is generated and never
+edited by hand.
 
 Scenarios: `uv run python scripts/scenarios.py` runs Mel's five scripted conversations live
-on the default model and checks them, so it spends credits and never runs in CI. Source the
-key from the main checkout's `.env` the same way. It writes `examples/01-…` to `05-…` for
+on the default model and checks them, so it spends credits and never runs in CI. Run from the
+repo root, it reads the repo-root `.env` the same way. It writes `examples/01-…` to `05-…` for
 the scenarios that pass; they are generated and never edited by hand. The same run as a
 test: `uv run pytest -m live` (deselected by default, skipped without the key).
 
 WhatsApp dry run: `uv run python scripts/whatsapp_dryrun.py "Oi, vocês têm violão?"` feeds one
 message through the WhatsApp core and prints Mel's reply; it needs no Twilio account but calls
-the real model, so it spends credits. Source the key the same way.
+the real model, so it spends credits. Run from the repo root, it reads the repo-root `.env`.
 
 ## Validation
 
@@ -88,11 +88,10 @@ Unit tests never call an LLM. Never commit `.env` or any API key.
 
 ## Software factory
 
-The code was built with a local software factory (`factory/`, `.claude/agents/`,
-`.claude/skills/factory/`). That tooling is gitignored and not part of this repository;
-where it exists, `/factory run` builds every open GitHub issue labeled `factory` through
-intake → spec → build → gate → review → approve, one PR per issue.
+The code was built with a local software factory of Claude Code agents, which took each
+GitHub issue through intake, spec, build, automated checks, review and approval, one PR per
+issue. That tooling is not in this repository.
 
-Each factory job works in its own git worktree, a full checkout of the repo at
+Each factory job worked in its own git worktree, a full checkout of the repo at
 `.worktrees/<job-id>` (gitignored). A tool run from the repo root that doesn't
 read `.gitignore` sees those copies too; exclude `.worktrees/` in its config.
