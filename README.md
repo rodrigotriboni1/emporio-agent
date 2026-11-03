@@ -220,7 +220,7 @@ Each decision with the alternatives that were rejected. Sources:
   credentials stay in their conversation history, so the model re-sends them on a follow-up.
   Rejected: a "verified customer" flag in `deps` (the web UI's `to_web()` shares one `deps`
   object across all conversations, so it would leak between customers) and server-side history
-  (it would store customer PII on disk, against LGPD and manual section 9).
+  (it would store customer PII on disk, against LGPD and the manual's privacy section).
 - **Limits in a `Hooks` capability, not `UsageLimits`.** `UsageLimits` is passed per run, but
   `to_web()` takes no usage limits (a web run would fall back to PydanticAI's default of 50
   requests). Hooks registered on the `Agent` apply in every interface.
@@ -285,10 +285,10 @@ is visible only in the data.
 | Installments: the summary table in section 3 disagrees with the tiers in section 3.1. | Section 3.1 wins: up to 3x with no minimum, 4x–6x need installments of at least R$ 80,00, 7x–12x at least R$ 100,00. |
 | "Exceto abaixo de R$ 50,00" is ambiguous. | Purchases below R$ 50 are not split into installments. |
 | The manual says "mais de 300 instrumentos"; the catalog has 65 products. | Mel never quotes a catalog size. |
-| The woodwind (Instrumentos de Sopro (Madeiras)) and orchestral strings (Cordas Orquestrais) categories have no products. | Mel says nothing is available in the system right now, not "we don't sell it". |
+| The woodwind (Instrumentos de Sopro (Madeiras)), brass (Instrumentos de Sopro (Metais)) and orchestral strings (Cordas Orquestrais) categories have no products. | Mel says nothing is available in the system right now, not "we don't sell it". |
 | The manual says to suggest partner stores, but no partner list exists. | No partner store is ever named. |
-| Product 136 is `discontinued` but has stock 13. | Status beats stock: "no longer in the catalog", plus alternatives. |
-| Product 130 is `coming_soon` but was sold in orders 3 and 14. | Status wins for new sales ("coming soon", not sold, stock not quoted); past orders are reported as recorded. |
+| Product 136 is `discontinued` but has stock 13. | Status beats stock: shown as "fora de linha" (no longer in the catalog), plus alternatives. |
+| Product 130 is `coming_soon` but was sold in orders 3 and 14. | Status wins for new sales (shown as "em breve", not sold, stock not quoted); past orders are reported as recorded. |
 | Product names contradict their descriptions in products 135–144. | Name and specs are the source of truth; descriptions are never returned. |
 | Product 96 is `active` with stock 0. | Shown as unavailable, plus same-category alternatives; no reservation promised. |
 | Orders 9, 16 and 18 use more installments than the minimums allow. | Orders are reported as recorded; the rules apply to new quotes only. |
@@ -309,13 +309,13 @@ order data needs valid credentials in the same `get_order` call, no tool changes
 customer data or accepts a customer id (the only write is the handoff record), tools never
 return a customer's phone, e-mail or full name, and the `Hooks` capability caps input size,
 requests per turn and conversation length, so a successful injection can at worst produce an
-off-brand reply or a spurious handoff record. It would add one more model call per turn, in series, before
-Mel can start, adding latency and cost to every message. It gives false positives on the short,
-unaccented PT-BR messages customers actually send, like "violao?". And it forces a choice
-between failing closed (a classifier outage or false positive blocks real customers) and
-failing open (an outage lets everything through, so it protected nothing). If the logs ever
-show a need, the next step would be a fail-open structured-output classifier with logging,
-behind a labelled eval set that measures its false-positive rate on real PT-BR
+off-brand reply or a spurious handoff record. It would add one more model call per turn, in
+series, before Mel can start, adding latency and cost to every message. It gives false
+positives on the short, unaccented PT-BR messages customers actually send, like "violao?". And
+it forces a choice between failing closed (a classifier outage or false positive blocks real
+customers) and failing open (an outage lets everything through, so it protected nothing). If
+the logs ever show a need, the next step would be a fail-open structured-output classifier
+with logging, behind a labelled eval set that measures its false-positive rate on real PT-BR
 traffic before it gates anything.
 
 ## Limitations
