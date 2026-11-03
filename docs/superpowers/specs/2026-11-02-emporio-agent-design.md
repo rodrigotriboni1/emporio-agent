@@ -279,6 +279,11 @@ the same rules apply in the CLI, the web UI and the scenarios:
   confirmed by the spike) stops the turn with a fixed PT-BR text that gives
   the WhatsApp number and opening hours. No automatic handoff: no model call is
   left to make one.
+- `before_model_request`: a conversation whose total text (user and model text,
+  tool-call arguments and tool returns, not instructions) is over 40,000
+  characters stops with a fixed PT-BR text asking the customer to start a new
+  conversation. The web UI sends the whole history with every request, so this
+  bounds the cost of each turn.
 - Tool calls are logged to stderr with masked, truncated arguments (section 9).
 - `after_run`: requests and input/output tokens for the turn are logged; the
   scenario transcripts and the spike table report them.
