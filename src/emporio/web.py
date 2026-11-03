@@ -3,11 +3,18 @@
 from contextlib import asynccontextmanager
 
 from starlette.applications import Starlette
+from starlette.routing import Route
 
-from emporio import config
+from emporio import config, whatsapp, whatsapp_twilio
 from emporio.agent import Deps, agent
 
 deps = Deps(now=config.clock())
+twilio = whatsapp_twilio.from_env()  # None unless all four TWILIO_* vars are set
+routes = (
+    [Route("/whatsapp/twilio", whatsapp.Middleware(twilio, deps).webhook, methods=["POST"])]
+    if twilio
+    else []
+)
 
 
 @asynccontextmanager
@@ -18,4 +25,4 @@ async def _lifespan(app: Starlette):
     yield
 
 
-app = Starlette(lifespan=_lifespan)
+app = Starlette(routes=routes, lifespan=_lifespan)
