@@ -198,5 +198,4 @@ researched, wrote the code and reviewed it.
 
 ## Credits
 
-- Some ideas came from [AlvarDev/sre-genai](https://github.com/AlvarDev/sre-genai); no code copied.
 - The store data in `data/` is fictional and was provided by the challenge.
