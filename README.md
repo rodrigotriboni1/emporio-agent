@@ -59,6 +59,51 @@ uv run --frozen ruff format --check .
 uv run --frozen pytest -q
 ```
 
+## WhatsApp channel
+
+Mel can also answer on WhatsApp through Twilio. The route `POST /whatsapp/twilio` exists on the
+web server only when the four `TWILIO_*` variables in `.env` are all set; otherwise it answers
+404. On each incoming message it:
+
+- checks the `X-Twilio-Signature` header (HMAC-SHA1 over `TWILIO_WEBHOOK_URL` and every form
+  field) and answers 403 on a bad or missing signature;
+- acknowledges at once with an empty `<Response/>`, ignoring a repeated `MessageSid`, then runs
+  Mel in the background and sends the reply through Twilio's Messages API, with `**bold**`
+  turned into WhatsApp's `*bold*`, headings stripped and long replies split into parts of at
+  most 1,000 characters;
+- keeps each sender's history in memory, one turn at a time per sender, and forgets it after
+  24 h without messages; after the conversation-size limit message the next message starts a
+  fresh history;
+- answers a photo, audio, location or any other non-text message with a fixed text-only reply,
+  without calling the model.
+
+The sender's phone number never reaches Mel: order lookups still need the order number and the
+phone or e-mail the customer types. Phone numbers are masked in every `[whatsapp]` log line.
+
+Connecting the Twilio Sandbox:
+
+1. In the Twilio Console, open the WhatsApp Sandbox and send `join <code>` from your phone to
+   the Sandbox number.
+2. Run the web server (`uv run uvicorn emporio.web:app --host 127.0.0.1 --port 7932`) and expose
+   that port through an HTTPS tunnel (any tunnel tool).
+3. Set "When a message comes in" to `https://<tunnel>/whatsapp/twilio`, method POST.
+4. In `.env`, set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` (the Sandbox
+   number, as `whatsapp:+14155238886`) and `TWILIO_WEBHOOK_URL`, exactly the URL from step 3.
+   The signature is checked against that URL, never the one the server sees behind the tunnel.
+   Restart the server.
+
+Without any WhatsApp account, `uv run python scripts/whatsapp_dryrun.py "Oi, vocês têm violão?"`
+feeds one message through the same core and prints Mel's reply parts as `Mel: …`. It calls the
+real model, so it needs `OPENROUTER_API_KEY` and spends credits.
+
+Twilio says the Sandbox number "might be temporarily restricted from sending to certain
+countries, such as Brazil", so replies to +55 numbers may fail; test with your number first.
+The planned fallback is a Meta WhatsApp Cloud API adapter on the same core (`whatsapp.Channel`).
+
+Out of scope for now: the Meta adapter, message templates and re-engaging a customer after the
+24-hour window, media handling, persisting history, and using the sender's phone number as the
+order credential.
+
 ## Model choice
 
 The model is whatever `MODEL` in `.env` says. Any PydanticAI OpenRouter id works, in the form
@@ -75,7 +120,8 @@ to do.
 ### Code structure: pure core, thin shell
 
 Hexagonal in spirit, without the ceremony: a pure functional core and a thin imperative shell,
-with no `Protocol` ports, no DTOs and no composition root. Dependencies point inward only.
+with no DTOs and no composition root, and a single `Protocol` port, `whatsapp.Channel`, because
+there the same core serves several messaging providers. Dependencies point inward only.
 
 | Module | Role |
 |---|---|
@@ -86,7 +132,9 @@ with no `Protocol` ports, no DTOs and no composition root. Dependencies point in
 | `agent.py` | The PydanticAI `Agent`, the four thin tool wrappers, `Deps` (the clock only) and the `Hooks` capability. The only module that imports PydanticAI. |
 | `prompt.py` | Mel's instructions, in sections F1 to F4 that map to the challenge's criteria. |
 | `config.py` | Stdlib only: loads `.env` (real env vars win) and turns `EMPORIO_NOW` into the clock. |
-| `cli.py`, `web.py` | Thin entry points: a REPL over `agent.run_sync`, and `agent.to_web()` mounted in Starlette. |
+| `cli.py`, `web.py` | Thin entry points: a REPL over `agent.run_sync`, and `agent.to_web()` mounted in Starlette, plus the WhatsApp route when Twilio is configured. |
+| `whatsapp.py` | The WhatsApp channel core: the `Channel` port, in-memory history per sender, dedupe, per-sender locks, reply formatting and one agent turn per message. No PydanticAI import. |
+| `whatsapp_twilio.py` | The Twilio adapter for `Channel`: signature check against `TWILIO_WEBHOOK_URL`, form parsing, and sending through the Messages API. Stdlib and Starlette only. |
 
 Module imports inside `src/emporio/`:
 
@@ -96,6 +144,12 @@ flowchart LR
     cli --> agent
     web --> config
     web --> agent
+    web --> whatsapp
+    web --> whatsapp_twilio
+    whatsapp --> agent
+    whatsapp --> cli
+    whatsapp --> services
+    whatsapp_twilio --> whatsapp
     agent --> config
     agent --> prompt
     agent --> services
@@ -213,7 +267,7 @@ Each decision with the alternatives that were rejected. Sources:
 - **A pure core without `Protocol` ports or DTOs.** The rules live in `domain.py` as plain
   functions over frozen dataclasses, tested without mocks. Full hexagonal ports, DTOs and a
   composition root were rejected as ceremony: there is one adapter per port and no second one
-  coming.
+  coming. The exception is `whatsapp.Channel`, where a second adapter (Meta) is planned.
 - **Stateless order verification; `deps` holds only the clock.** `get_order` takes the order
   number plus the phone or e-mail on that order and checks them on every call; no tool accepts
   a customer id, and nothing about the customer is kept between calls. The customer's own
@@ -328,6 +382,8 @@ traffic before it gates anything.
   between processes.
 - Conversation history lives in memory only (the CLI process, or the browser tab in the web
   UI); closing it loses the conversation.
+- WhatsApp history, the `MessageSid` dedupe and the per-sender locks live in one server
+  process's memory, so they are lost on restart and not shared between processes.
 - The web UI front end loads from a CDN and is meant for local development, not production.
 - Shipping outside Campo Grande is never quoted (no CEP lookup); Mel says it needs a quote by
   CEP and never invents a value.
@@ -348,16 +404,17 @@ change waits for a measured bottleneck.
 | Knowledge (one manual → many documents, FAQs, tickets) | `get_policy` serves 9 fixed topics | RAG enters here: chunks by section with metadata, hybrid retrieval and reranking, answers still cite their source | "Only answer from a source" |
 | Traffic (many concurrent customers) | Failure lock and handoffs in process memory and a file | Verification is already stateless, so the app scales horizontally; the lock moves to Redis with a TTL plus rate limiting; handoffs go to a queue or ticketing system | Tools, prompt, rules |
 | Domains (4 → 30 tools: sales, post-sale, billing, tech support) | One agent with many tools starts picking the wrong one | Multi-agent enters here: a cheap router in front of specialists, each with a few tools and its own prompt (or, first, filtering tools by intent), triggered when the spike harness shows tool accuracy dropping | Specialists reuse the same `services` |
-| Channels (real WhatsApp, Instagram, website) | Local CLI and web UI only | The agent sits behind a webhook API with one adapter per channel; the tools are also exposed as an MCP server for the back office | The agent itself |
+| Channels (WhatsApp, Instagram, website) | CLI, web UI and WhatsApp through Twilio, with history in one process's memory | More adapters on the `whatsapp.Channel` port (Meta Cloud API next) and other channels behind the same webhook pattern; history moves to an encrypted store with retention; the tools are also exposed as an MCP server for the back office | The agent itself |
 | Multiple stores | One store's data and persona | A tenant id in `deps`, data filtered per tenant, persona and manual per store | The rule code |
 | Quality and cost | Spike and scenarios run by hand, once | Scenarios become a scheduled regression suite with repeated runs and pass rates; OpenTelemetry traces per tool, tokens and cost per conversation; model routing (cheap model for simple turns, stronger one for hard cases) | The spike and scenario harness |
 
-The persona already places Mel on the store's WhatsApp channel (manual section 7), but the
-prototype does not connect to WhatsApp. Doing so changes two design points: WhatsApp does not
-resend the conversation, so history has to be stored server-side per phone number (encrypted,
-with retention, for LGPD); and the sender's phone number arrives verified by the channel, so it
-can serve as the order credential when it matches the order's customer, while the e-mail path
-stays for other cases.
+The persona places Mel on the store's WhatsApp channel (manual section 7), and the prototype
+now connects to it through Twilio (see "WhatsApp channel"). WhatsApp does not resend the
+conversation, so history is kept server-side per phone number; today that is in process memory
+with a 24 h idle expiry and a 500-sender cap, and at scale it needs an encrypted store with
+retention, for LGPD. The sender's phone number arrives verified by the channel, so it could
+later serve as the order credential when it matches the order's customer, while the e-mail path
+stays for other cases; the prototype does not do that yet.
 
 ## Next steps
 
