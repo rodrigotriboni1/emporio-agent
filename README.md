@@ -41,7 +41,7 @@ uv run --frozen pytest -q
 
 ## Example conversations
 
-- [`examples/01-catalog-search.md`](examples/01-catalog-search.md): guitars up to R$ 1000, then electro-acoustics in that range.
+- [`examples/01-catalog-search.md`](examples/01-catalog-search.md): guitars up to R$ 1000, then electro-acoustics up to R$ 1000 by PIX price.
 - [`examples/02-price-payment-and-store-info.md`](examples/02-price-payment-and-store-info.md): Takamine GD20 price and installments, hours, address, payment rules.
 - [`examples/03-return-after-regret-window.md`](examples/03-return-after-regret-window.md): a regret return past its window, checked by order lookup, then handed off.
 - [`examples/04-late-order.md`](examples/04-late-order.md): a late order with tracking and delay; a second order with the wrong e-mail reveals nothing.
@@ -168,9 +168,8 @@ erDiagram
   behaviours: 1 Persona, 2 Grounding, 3 Tool routing, 4 Scope. `instructions(now)` prepends the
   weekday, date and time on every run. Enforced in code, not the prompt: credentials on every
   `get_order` call, phone and e-mail masking (`services.mask_text`), every price, PIX price and
-  installment from `domain.py`, and the `Hooks` limits. Prompt rules: persona, slogan, emoji,
-  tone, no haggling, handoff consent, no partner stores, ignoring injection. Scenarios run at
-  temperature 0.
+  installment from `domain.py`, and the `Hooks` limits. Prompt rules: persona, slogan, emoji, tone,
+  no haggling, handoff consent, no partner stores, ignoring injection. Scenarios use temperature 0.
 - **Retrieval: whole policy sections by topic, not RAG.** `data/politicas.md` is about 260 lines in
   nine `## [topic]` sections; `store.py` splits on those tags and `get_policy(topic)` returns one
   whole section, routed by exact topic, with no similarity ranking to get wrong. Chunking could
@@ -179,6 +178,8 @@ erDiagram
 - **Price ceiling.** `max_price` compares against the lowest payable price: the PIX price, or the
   promotional price when a promotion is active (PIX does not stack on it). So in
   `examples/01-catalog-search.md` the R$ 1.049,00 guitar (R$ 996,55 via PIX) is "até R$ 1000".
+- **A pure core, no ports or DTOs**: plain functions over frozen dataclasses in `domain.py`, tested
+  without mocks; the one port, `whatsapp.Channel`, has a second adapter (Meta) planned.
 - **Stateless order verification**: credentials checked per call, `deps` holds only the clock, as
   `to_web()` shares one `deps` across conversations. **Regex masking**: handoff text is free-form.
 - **Limits in `Hooks`, not `UsageLimits`** (`to_web()` takes none): messages over 2,000 characters
@@ -186,14 +187,13 @@ erDiagram
 - **Non-goals:** multi-agent; text-to-SQL (could read any customer's rows); storing conversations
   on disk (PII; history stays in memory: CLI, browser tab, or WhatsApp per-sender); a hand-written
   chat API (the only custom endpoint is the optional WhatsApp webhook); a custom UI (the built-in
-  chat UI and the CLI are enough for a prototype); Docker; write operations.
+  one is enough); Docker; write operations.
 
 ## Spike results
 
 `scripts/spike.py` ran the real agent on nine scripted turns on 2026-11-03 (per-turn rows:
-[`docs/spike-results.md`](docs/spike-results.md)). Rule: pass both checks, then best accuracy,
-latency, cost. DeepSeek wins; Gemini ties on accuracy but is about 5x slower, and Claude Sonnet
-missed the second order follow-up.
+[`docs/spike-results.md`](docs/spike-results.md)). DeepSeek wins on the rule (both checks, then
+accuracy, latency, cost); Gemini ties on accuracy but is about 5x slower, Sonnet missed a follow-up.
 
 | Model | Tool accuracy | Args valid | Median latency (s) | Total cost (USD) | History valid | Stopped turn OK |
 |---|---|---|---|---|---|---|
@@ -202,6 +202,8 @@ missed the second order follow-up.
 | openrouter:deepseek/deepseek-v4.1-flash | 100% | 100% | 2.21 | 0.00397 | yes | yes |
 
 ## Data inconsistencies
+
+Most rows are asserted by `tests/test_store.py` (data) or noted in `data/politicas.md` (manual).
 
 | Inconsistency | Adopted assumption |
 |---|---|
@@ -267,9 +269,9 @@ like "violao?", and either fail closed (blocking customers) or open (protecting 
   rounds challenging each decision, and a research agent's report that chose the framework.
 - **Build:** a pipeline of Claude Code agents (intake, spec, build, automated checks, review,
   approval), one pull request per GitHub issue, not included in this repository; a branch reached
-  review only when the validation commands passed. Opus reviews changed real
-  things: accent-insensitive name masking, a conversation-size cap, and a prompt fix so Mel
-  looks orders up before handing off.
+  review only when the validation commands passed. Review passes by Opus agents changed real
+  things: accent-insensitive name masking, a conversation-size cap, and a prompt fix so Mel looks
+  orders up before handing off.
 - **By hand:** the five transcripts were read before merging, and a two-tab check in the web UI
   held: tab B asked for order 8's tracking code with no credentials and Mel revealed nothing.
 
@@ -290,9 +292,8 @@ same core (real model, spends credits).
 2. Run `uv run uvicorn emporio.whatsapp_app:app --host 127.0.0.1 --port 7933` and tunnel only
    port 7933. **Never tunnel port 7932:** the chat UI has no login, only a `Host` header check
    that a tunnel rewriting `Host` defeats, so anyone could spend your credits.
-3. Point "When a message comes in" at `https://<tunnel>/whatsapp/twilio` (POST); set that URL as
-   `TWILIO_WEBHOOK_URL`, plus `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`;
-   restart the server.
+3. Point "When a message comes in" at `https://<tunnel>/whatsapp/twilio` (POST); in `.env` set that
+   URL as `TWILIO_WEBHOOK_URL`, plus the other three `TWILIO_*` variables, and restart.
 
 Known limitations: replay (signatures carry no timestamp; the dedupe keeps only the last 1,000
 `MessageSid`s), recycled numbers (history is kept per number for 24 h, so a new holder continues
