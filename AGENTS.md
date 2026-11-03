@@ -22,6 +22,11 @@ Two interfaces, run from the repo root (both read `.env` there):
   `uv run uvicorn emporio.web:app --host 127.0.0.1 --port 7932`
 - CLI: `uv run python -m emporio.cli`
 
+Model spike: `uv run python scripts/spike.py` compares the candidate models live on
+OpenRouter, so it spends credits and never runs in CI. Source the key from the main
+checkout's `.env` first (`set -a; source <main checkout>/.env; set +a`). It writes
+`docs/spike-results.md`, which is generated and never edited by hand.
+
 ## Validation
 
 Must match `factory/checks.sh`:
