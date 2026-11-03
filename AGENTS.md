@@ -37,6 +37,8 @@ Unit tests never call an LLM. Never commit `.env` or any API key.
 - Code, identifiers, comments, commits and docs in English. Mel's replies to
   customers are PT-BR (English if the customer writes in English);
   `data/politicas.md` stays in PT.
+- `src/emporio/domain.py` is the pure core: no I/O, no imports from other
+  `emporio` modules, and time is always passed in as `now`.
 - Conventional Commits. Never push to `main`; work on a branch and open a PR.
   PRs merge with a merge commit, never squash.
 
