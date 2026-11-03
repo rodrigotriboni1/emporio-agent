@@ -21,6 +21,7 @@ IDLE_TTL_S = 24 * 3600  # the WhatsApp customer-service window
 MAX_USERS = 500  # bounds memory and the PII held
 MAX_SEEN_IDS = 1000
 MAX_CHUNK = 1000  # under Twilio's 1,600 and the reported (unverified) 1,024 for WhatsApp
+MAX_BODY_BYTES = 64 * 1024  # a webhook form is a few KB; bounds what an unsigned caller can send
 
 TEXT_ONLY = (
     "Por enquanto eu só consigo ler mensagens de texto. Pode escrever sua dúvida, por favor?"
@@ -92,6 +93,23 @@ def _log(line: str) -> None:
     print(f"[whatsapp] {services.mask_text(STORE, line)}", file=sys.stderr)
 
 
+async def _capped(request: Request) -> Request | None:
+    """The request with its body read in full, or None once the body is over MAX_BODY_BYTES."""
+    length = request.headers.get("content-length", "")
+    if length.isdigit() and int(length) > MAX_BODY_BYTES:
+        return None
+    body = b""
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > MAX_BODY_BYTES:
+            return None
+
+    async def receive() -> dict:
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    return Request(request.scope, receive)
+
+
 class Middleware:
     def __init__(
         self, channel: Channel, deps: Deps, conversations: Conversations | None = None
@@ -104,6 +122,12 @@ class Middleware:
         self._pending: dict[str, int] = {}  # turns running or waiting per user
 
     async def webhook(self, request: Request) -> Response:
+        # Checked before the signature, so an unsigned caller can't make the server buffer more.
+        capped = await _capped(request)
+        if capped is None:
+            _log(f"rejected a webhook body over {MAX_BODY_BYTES} bytes")
+            return Response(status_code=413)
+        request = capped
         if not await self.channel.verify(request):
             _log("rejected a webhook with a bad or missing signature")
             return Response(status_code=403)

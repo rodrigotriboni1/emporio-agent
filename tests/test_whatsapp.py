@@ -11,12 +11,21 @@ from pydantic_ai import models
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models.function import FunctionModel
 from starlette.applications import Starlette
+from starlette.requests import Request
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from emporio import cli, services, whatsapp
 from emporio.agent import HISTORY_TOO_LONG, MAX_HISTORY_CHARS, Deps, agent
-from emporio.whatsapp import MAX_CHUNK, MAX_USERS, TEXT_ONLY, Conversations, Inbound, to_whatsapp
+from emporio.whatsapp import (
+    MAX_BODY_BYTES,
+    MAX_CHUNK,
+    MAX_USERS,
+    TEXT_ONLY,
+    Conversations,
+    Inbound,
+    to_whatsapp,
+)
 from emporio.whatsapp_twilio import Twilio, twilio_signature
 
 models.ALLOW_MODEL_REQUESTS = False
@@ -115,6 +124,41 @@ def test_signature_must_use_the_configured_url(sent):
         # The URL the test client's request.url shows, not TWILIO_WEBHOOK_URL.
         response = post(client, url="http://testserver/whatsapp/twilio")
     assert response.status_code == 403
+    assert model.seen == [] and sent == []
+
+
+def test_oversized_content_length_is_413_before_reading(sent):
+    async def receive():
+        raise AssertionError("body read")
+
+    headers = [(b"content-length", str(MAX_BODY_BYTES + 1).encode())]
+    request = Request({"type": "http", "method": "POST", "headers": headers}, receive)
+    _, middleware = make_client()
+    assert asyncio.run(middleware.webhook(request)).status_code == 413
+    assert sent == []
+
+
+def test_oversized_stream_stops_reading_at_the_cap(sent, capsys):
+    reads = []
+
+    async def receive():
+        reads.append(1)
+        return {"type": "http.request", "body": b"x" * 1024, "more_body": True}
+
+    # No Content-Length, as with a chunked body: the cap is enforced while reading.
+    request = Request({"type": "http", "method": "POST", "headers": []}, receive)
+    _, middleware = make_client()
+    assert asyncio.run(middleware.webhook(request)).status_code == 413
+    assert len(reads) == MAX_BODY_BYTES // 1024 + 1
+    assert sent == [] and "[whatsapp]" in capsys.readouterr().err
+
+
+def test_oversized_signed_post_is_413(sent):
+    client, _ = make_client()
+    model = Model()
+    with agent.override(model=FunctionModel(model)):
+        response = post(client, body="x" * MAX_BODY_BYTES)
+    assert response.status_code == 413
     assert model.seen == [] and sent == []
 
 
