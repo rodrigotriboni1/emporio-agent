@@ -60,5 +60,5 @@ Selection rule: Among models whose history check and stopped-turn check both pas
 
 ## Author checks
 
-- [ ] Web UI chats via OpenRouter on the default model
-- [ ] Two browser tabs: an order lookup in one grants nothing in the other (spec §16 S5)
+- [x] Web UI chats via OpenRouter on the default model
+- [x] Two browser tabs: an order lookup in one grants nothing in the other (spec §16 S5)
